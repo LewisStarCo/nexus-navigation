@@ -91,7 +91,10 @@ export default function Home() {
       if (saved) {
         const data = JSON.parse(saved);
         if (Array.isArray(data.links)) setLinks(data.links);
-        if (Array.isArray(data.categories)) setCategories(data.categories);
+        if (Array.isArray(data.categories)) {
+          setCategories(data.categories);
+          setForm((current) => ({ ...current, category: data.categories[0] || "" }));
+        }
         if (typeof data.username === "string") setUsername(data.username);
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
         if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
@@ -152,7 +155,11 @@ export default function Home() {
   function editLink(link: NavLink) { setEditingId(link.id); setForm({ title: link.title, description: link.description, url: link.url, category: link.category }); }
   function removeCategory(category: string) {
     if (!confirm(`删除“${category}”及其中的所有网址？`)) return;
-    setCategories((items) => items.filter((item) => item !== category));
+    setCategories((items) => {
+      const next = items.filter((item) => item !== category);
+      setForm((current) => current.category === category ? { ...current, category: next[0] || "" } : current);
+      return next;
+    });
     setLinks((items) => items.filter((item) => item.category !== category));
     if (activeCategory === category) setActiveCategory("全部");
   }
@@ -177,6 +184,7 @@ export default function Home() {
     setCategories((items) => {
       const next = items.filter((item) => item !== draggedCategory);
       next.splice(next.indexOf(target), 0, draggedCategory);
+      if (!editingId) setForm((current) => ({ ...current, category: next[0] || "" }));
       return next;
     });
     setDraggedCategory(null);
@@ -202,7 +210,7 @@ export default function Home() {
   function editFocusEvent(item: NexusEvent) { setEditingEventId(item.id); setFocusForm({ title: item.title, category: item.category, startTime: item.startTime, endTime: item.endTime || item.startTime, priority: item.priority, type: item.type }); setFocusComposerOpen(true); }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址、任务和用户名将被清除。")) return;
-    setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setEvents(createDefaultEvents()); setActiveCategory("全部");
+    setLinks(defaultLinks); setCategories(defaultCategories); setForm({ title: "", description: "", url: "", category: defaultCategories[0] }); setUsername(""); setZones(defaultZones); setEvents(createDefaultEvents()); setActiveCategory("全部");
   }
 
   return (
