@@ -49,14 +49,17 @@ export default function Home() {
   const [categories, setCategories] = useState(defaultCategories);
   const [username, setUsername] = useState("");
   const [zones, setZones] = useState<ClockZone[]>(defaultZones);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
   const [query, setQuery] = useState("");
+  const [googleQuery, setGoogleQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("全部");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryDraft, setCategoryDraft] = useState("");
+  const [draggedCategory, setDraggedCategory] = useState<string | null>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [ready, setReady] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", url: "", category: defaultCategories[0] });
@@ -70,6 +73,7 @@ export default function Home() {
         if (Array.isArray(data.categories)) setCategories(data.categories);
         if (typeof data.username === "string") setUsername(data.username);
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
+        if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
       }
     } catch { /* Keep defaults if saved data is unavailable. */ }
     setReady(true);
@@ -79,13 +83,13 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones }));
-  }, [links, categories, username, zones, ready]);
+    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme }));
+  }, [links, categories, username, zones, theme, ready]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault(); document.getElementById("site-search")?.focus();
+        event.preventDefault(); document.getElementById("google-search")?.focus();
       }
       if (event.key === "Escape") setSettingsOpen(false);
     };
@@ -135,17 +139,31 @@ export default function Home() {
     setEditingCategory(null);
     setCategoryDraft("");
   }
+  function moveCategory(target: string) {
+    if (!draggedCategory || draggedCategory === target) return;
+    setCategories((items) => {
+      const next = items.filter((item) => item !== draggedCategory);
+      next.splice(next.indexOf(target), 0, draggedCategory);
+      return next;
+    });
+    setDraggedCategory(null);
+  }
+  function searchGoogle(event: FormEvent) {
+    event.preventDefault();
+    const value = googleQuery.trim();
+    if (value) window.open(`https://www.google.com/search?q=${encodeURIComponent(value)}`, "_blank", "noopener,noreferrer");
+  }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址和用户名将被清除。")) return;
     setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setActiveCategory("全部");
   }
 
   return (
-    <main className="shell">
+    <main className={`shell theme-${theme}`}>
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <header className="topbar">
         <a className="brand" href="#top"><span className="brand-mark">N</span><span>Nexus</span></a>
-        <button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button>
+        <div className="top-actions"><label className="mini-search"><span className="search-icon" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选导航…" aria-label="筛选导航" />{query && <button onClick={() => setQuery("")}>×</button>}</label><button className="theme-toggle" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} aria-label="切换亮色和暗色">{theme === "dark" ? "☀" : "☾"}</button><button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button></div>
       </header>
 
       <section className="hero" id="top">
@@ -158,7 +176,7 @@ export default function Home() {
         </div>
         {!username && <button className="name-prompt" onClick={() => setSettingsOpen(true)}>填写你的名字，让这里更像你的主页 →</button>}
         <p className="intro">学习、思考、创造。把每天常用的网站收进一个安静、好用的入口。</p>
-        <label className="search-box"><span className="search-icon" /><input id="site-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索网站名称或网址…" />{query ? <button type="button" onClick={() => setQuery("")}>×</button> : <kbd>⌘ K</kbd>}</label>
+        <form className="search-box" onSubmit={searchGoogle}><span className="google-g">G</span><input id="google-search" value={googleQuery} onChange={(e) => setGoogleQuery(e.target.value)} placeholder="用 Google 搜索互联网…" aria-label="Google 搜索" /><button className="google-submit" type="submit" aria-label="搜索">↗</button><kbd>⌘ K</kbd></form>
         <div className="filters">
           {["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}
         </div>
@@ -180,7 +198,7 @@ export default function Home() {
           <div className="manager-scroll">
             <section className="setting-section"><label className="field-label">你的名字</label><input className="field" value={username} onChange={(e) => setUsername(e.target.value.slice(0, 20))} placeholder="在这里填写用户名" /><p className="field-help">将显示在首页问候语中，随时可以修改。</p></section>
             <section className="setting-section"><div className="setting-title"><h3>时区与时钟</h3><span>{zones.length}</span></div><p className="field-help timezone-help">第一个时区是主时区，用于判断早上、中午或晚上。</p><div className="timezone-list">{zones.map((item, index) => <div key={`${item.zone}-${index}`}><p><strong>{item.label}</strong><small>{item.zone}</small></p>{index > 0 && <button onClick={() => setZones((items) => [item, ...items.filter((_, i) => i !== index)])}>设为主时区</button>}{zones.length > 1 && <button className="danger" onClick={() => setZones((items) => items.filter((_, i) => i !== index))}>删除</button>}</div>)}</div><div className="timezone-add"><select value={zoneToAdd} onChange={(e) => setZoneToAdd(e.target.value)}>{zoneOptions.filter((option, index, all) => all.findIndex((item) => item.zone === option.zone) === index).map((item) => <option value={item.zone} key={item.zone}>{item.label} · {item.zone}</option>)}</select><button onClick={() => { const item = zoneOptions.find((option) => option.zone === zoneToAdd); if (item && !zones.some((zone) => zone.zone === item.zone)) setZones((current) => [...current, item]); }}>添加时区</button></div></section>
-            <section className="setting-section"><div className="setting-title"><h3>分类</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div key={category}><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
+            <section className="setting-section"><div className="setting-title"><h3>分类 · 拖动调整顺序</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div className={draggedCategory === category ? "dragging" : ""} draggable key={category} onDragStart={() => setDraggedCategory(category)} onDragOver={(e) => e.preventDefault()} onDrop={() => moveCategory(category)} onDragEnd={() => setDraggedCategory(null)}><b className="drag-handle">⠿</b><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
             <section className="setting-section"><div className="setting-title"><h3>{editingId ? "编辑网址" : "添加网址"}</h3><span>{links.length}</span></div>
               {categories.length ? <form className="link-form" onSubmit={submitLink}><label>名称<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="例如：Wikipedia" required /></label><label>网址<input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" required /></label><label>说明<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="一句简短说明（可选）" /></label><label>分类<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><div className="form-actions">{editingId && <button type="button" className="ghost" onClick={() => { setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] }); }}>取消</button>}<button className="primary">{editingId ? "保存修改" : "添加到导航"}</button></div></form> : <p className="field-help">请先添加一个分类。</p>}
             </section>
