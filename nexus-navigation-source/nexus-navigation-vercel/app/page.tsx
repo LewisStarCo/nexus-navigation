@@ -5,15 +5,17 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type NavLink = { id: string; title: string; description: string; url: string; category: string; mark: string; color: string };
 type ClockZone = { label: string; zone: string };
 type SearchEngine = { label: string; url: string };
-type FocusTask = { id: string; title: string; category: string; minutes: number; priority: "高" | "中" | "低"; completed: boolean };
+type NexusEvent = { id: string; title: string; category: string; priority: "High" | "Medium" | "Low"; type: "task" | "schedule"; date: string; startTime: string; endTime: string; duration: number; status: "pending" | "completed" | "unfinished"; source: "local" | "calendar" | "google-calendar" | "outlook-calendar" | "apple-calendar" | "ai-suggestion" };
 
 const defaultCategories = ["复旦学习", "AI 工具", "编程开发", "知识资源"];
 const palette = ["blue", "indigo", "violet", "cyan", "sky", "teal", "emerald", "amber", "orange", "rose", "purple", "pink"];
 const defaultZones: ClockZone[] = [{ label: "北京时间", zone: "Asia/Shanghai" }, { label: "旧金山时间", zone: "America/Los_Angeles" }];
-const defaultFocusTasks: FocusTask[] = [
-  { id: "focus-rust", title: "学习 Rust 所有权章节", category: "编程", minutes: 90, priority: "高", completed: false },
-  { id: "focus-algebra", title: "复习线性代数", category: "数学", minutes: 60, priority: "中", completed: false },
-  { id: "focus-paper", title: "阅读一篇 AI 论文", category: "科研", minutes: 45, priority: "低", completed: false },
+const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const createDefaultEvents = (): NexusEvent[] => [
+  { id: "event-math", title: "Engineering Mathematics", category: "数学", priority: "High", type: "schedule", date: localDate(), startTime: "09:00", endTime: "10:30", duration: 90, status: "pending", source: "local" },
+  { id: "event-rust", title: "Rust Learning", category: "Coding", priority: "High", type: "task", date: localDate(), startTime: "11:00", endTime: "12:30", duration: 90, status: "pending", source: "local" },
+  { id: "event-algebra", title: "Linear Algebra", category: "数学", priority: "Medium", type: "task", date: localDate(), startTime: "15:00", endTime: "16:00", duration: 60, status: "pending", source: "local" },
+  { id: "event-paper", title: "AI Paper Reading", category: "科研", priority: "Low", type: "task", date: localDate(), startTime: "21:00", endTime: "21:45", duration: 45, status: "pending", source: "local" },
 ];
 const searchEngines: SearchEngine[] = [
   { label: "Google", url: "https://www.google.com/search?q={query}" },
@@ -64,9 +66,10 @@ export default function Home() {
   const [zones, setZones] = useState<ClockZone[]>(defaultZones);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [searchEngine, setSearchEngine] = useState<SearchEngine>(searchEngines[0]);
-  const [focusTasks, setFocusTasks] = useState<FocusTask[]>(defaultFocusTasks);
+  const [events, setEvents] = useState<NexusEvent[]>(createDefaultEvents);
   const [focusComposerOpen, setFocusComposerOpen] = useState(false);
-  const [focusForm, setFocusForm] = useState({ title: "", category: "", minutes: "", priority: "中" as FocusTask["priority"] });
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [focusForm, setFocusForm] = useState({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium" as NexusEvent["priority"], type: "task" as NexusEvent["type"] });
   const [customEngine, setCustomEngine] = useState<SearchEngine>({ label: "", url: "" });
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
   const [query, setQuery] = useState("");
@@ -93,7 +96,8 @@ export default function Home() {
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
         if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
         if (data.searchEngine?.label && data.searchEngine?.url) setSearchEngine(data.searchEngine);
-        if (Array.isArray(data.focusTasks)) setFocusTasks(data.focusTasks);
+        if (Array.isArray(data.events)) setEvents(data.events.map((item: NexusEvent) => item.date < localDate() && item.status === "pending" ? { ...item, status: "unfinished" } : item));
+        else if (Array.isArray(data.focusTasks)) setEvents(data.focusTasks.map((task: { id: string; title: string; category: string; minutes: number; priority: string; completed: boolean }, index: number) => ({ id: task.id, title: task.title, category: task.category, priority: task.priority === "高" ? "High" : task.priority === "低" ? "Low" : "Medium", type: "task", date: localDate(), startTime: `${String(9 + index * 2).padStart(2, "0")}:00`, endTime: "", duration: task.minutes, status: task.completed ? "completed" : "pending", source: "local" })));
       }
     } catch { /* Keep defaults if saved data is unavailable. */ }
     setReady(true);
@@ -103,8 +107,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine, focusTasks }));
-  }, [links, categories, username, zones, theme, searchEngine, focusTasks, ready]);
+    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine, events }));
+  }, [links, categories, username, zones, theme, searchEngine, events, ready]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -122,9 +126,15 @@ export default function Home() {
     return links.filter((link) => (activeCategory === "全部" || link.category === activeCategory) && (!needle || `${link.title} ${link.description} ${link.url}`.toLowerCase().includes(needle)));
   }, [links, query, activeCategory]);
   const groupedLinks = categories.map((category) => ({ category, items: visibleLinks.filter((link) => link.category === category) })).filter((group) => group.items.length);
-  const focusCompleted = focusTasks.filter((task) => task.completed).length;
-  const focusRemaining = focusTasks.length - focusCompleted;
-  const focusProgress = focusTasks.length ? Math.round((focusCompleted / focusTasks.length) * 100) : 0;
+  const todayEvents = events.filter((event) => event.date === localDate()).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const focusCompleted = todayEvents.filter((event) => event.status === "completed").length;
+  const focusRemaining = todayEvents.length - focusCompleted;
+  const focusProgress = todayEvents.length ? Math.round((focusCompleted / todayEvents.length) * 100) : 0;
+  const monday = new Date(); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 7);
+  const weeklyEvents = events.filter((event) => { const date = new Date(`${event.date}T00:00:00`); return date >= monday && date < sunday; });
+  const weeklyCompleted = weeklyEvents.filter((event) => event.status === "completed").length;
+  const weeklyProgress = weeklyEvents.length ? Math.round((weeklyCompleted / weeklyEvents.length) * 100) : 0;
 
   const primaryHour = now ? Number(new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", hour12: false, timeZone: zones[0]?.zone }).formatToParts(now).find((part) => part.type === "hour")?.value ?? now.getHours()) : 12;
   const greeting = !now ? "你好" : primaryHour < 11 ? "早上好" : primaryHour < 14 ? "中午好" : primaryHour < 18 ? "下午好" : "晚上好";
@@ -176,18 +186,23 @@ export default function Home() {
     const value = googleQuery.trim();
     if (value) window.open(searchEngine.url.replace("{query}", encodeURIComponent(value)), "_blank", "noopener,noreferrer");
   }
-  function addFocusTask(event: FormEvent) {
+  function saveFocusEvent(event: FormEvent) {
     event.preventDefault();
     const title = focusForm.title.trim();
-    const minutes = Number(focusForm.minutes);
-    if (!title || !Number.isFinite(minutes) || minutes < 1) return;
-    setFocusTasks((items) => [...items, { id: crypto.randomUUID(), title, category: focusForm.category.trim() || "其他", minutes: Math.round(minutes), priority: focusForm.priority, completed: false }]);
-    setFocusForm({ title: "", category: "", minutes: "", priority: "中" });
+    if (!title || !focusForm.startTime || !focusForm.endTime) return;
+    const [sh, sm] = focusForm.startTime.split(":").map(Number); const [eh, em] = focusForm.endTime.split(":").map(Number);
+    const duration = Math.max(1, (eh * 60 + em) - (sh * 60 + sm));
+    const next = { title, category: focusForm.category.trim() || "其他", startTime: focusForm.startTime, endTime: focusForm.endTime, duration, priority: focusForm.priority, type: focusForm.type };
+    if (editingEventId) setEvents((items) => items.map((item) => item.id === editingEventId ? { ...item, ...next } : item));
+    else setEvents((items) => [...items, { ...next, id: crypto.randomUUID(), date: localDate(), status: "pending", source: "local" }]);
+    setEditingEventId(null);
+    setFocusForm({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium", type: "task" });
     setFocusComposerOpen(false);
   }
+  function editFocusEvent(item: NexusEvent) { setEditingEventId(item.id); setFocusForm({ title: item.title, category: item.category, startTime: item.startTime, endTime: item.endTime || item.startTime, priority: item.priority, type: item.type }); setFocusComposerOpen(true); }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址、任务和用户名将被清除。")) return;
-    setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setFocusTasks(defaultFocusTasks); setActiveCategory("全部");
+    setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setEvents(createDefaultEvents()); setActiveCategory("全部");
   }
 
   return (
@@ -209,27 +224,25 @@ export default function Home() {
         {!username && <button className="name-prompt" onClick={() => setSettingsOpen(true)}>填写你的名字，让这里更像你的主页 →</button>}
         <p className="intro">学习、思考、创造。把每天常用的网站收进一个安静、好用的入口。</p>
         <form className="search-box" onSubmit={searchGoogle}><span className="engine-badge">{searchEngine.label.slice(0, 2)}</span><input id="google-search" value={googleQuery} onChange={(e) => setGoogleQuery(e.target.value)} placeholder={`用 ${searchEngine.label} 搜索互联网…`} aria-label={`${searchEngine.label} 搜索`} /><button className="google-submit" type="submit" aria-label="搜索">↗</button><kbd>⌘ K</kbd></form>
-        <section className="focus-panel" aria-labelledby="focus-title">
-          <div className="focus-head"><div><h2 id="focus-title">Today&apos;s Focus</h2><p>今天还有 <strong>{focusRemaining}</strong> 个任务</p></div><button type="button" className="focus-add" onClick={() => setFocusComposerOpen((value) => !value)}>{focusComposerOpen ? "收起" : "＋ 添加任务"}</button></div>
-          {focusComposerOpen && <form className="focus-form" onSubmit={addFocusTask}><input autoFocus value={focusForm.title} onChange={(e) => setFocusForm({ ...focusForm, title: e.target.value })} placeholder="任务名称" required /><input value={focusForm.category} onChange={(e) => setFocusForm({ ...focusForm, category: e.target.value })} placeholder="分类，如编程" /><input type="number" min="1" max="1440" value={focusForm.minutes} onChange={(e) => setFocusForm({ ...focusForm, minutes: e.target.value })} placeholder="分钟" required /><select value={focusForm.priority} onChange={(e) => setFocusForm({ ...focusForm, priority: e.target.value as FocusTask["priority"] })}><option value="高">高优先级</option><option value="中">中优先级</option><option value="低">低优先级</option></select><button>添加</button></form>}
-          <div className="focus-list">
-            {focusTasks.map((task) => <article className={`focus-task ${task.completed ? "done" : ""}`} key={task.id}><label><input type="checkbox" checked={task.completed} onChange={() => setFocusTasks((items) => items.map((item) => item.id === task.id ? { ...item, completed: !item.completed } : item))} /><span><strong>{task.title}</strong><small>{task.category} · {task.minutes}分钟</small></span></label><span className={`priority priority-${task.priority}`}>{task.priority}</span><button className="focus-delete" type="button" aria-label={`删除${task.title}`} onClick={() => setFocusTasks((items) => items.filter((item) => item.id !== task.id))}>×</button></article>)}
-            {!focusTasks.length && <p className="focus-empty">今天还没有任务，给自己安排一个小目标吧。</p>}
-          </div>
-          <div className="focus-progress"><span>今日完成度</span><div><i style={{ width: `${focusProgress}%` }} /></div><strong>{focusProgress}%</strong></div>
-        </section>
-        <div className="filters">
-          {["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}
-        </div>
       </section>
 
-      <section className="directory" aria-live="polite">
-        {groupedLinks.map((group) => <div className="category-section" key={group.category}>
-          <div className="section-heading"><h2>{group.category}</h2><span>{String(group.items.length).padStart(2, "0")}</span><div /></div>
-          <div className="card-grid">{group.items.map((link) => <a className="link-card" href={link.url} target="_blank" rel="noreferrer" key={link.id}><SiteIcon link={link} /><span className="card-copy"><strong>{link.title}</strong><small>{link.description}</small><span className="domain">{domainOf(link.url)}</span></span><span className="arrow">↗</span></a>)}</div>
-        </div>)}
-        {!groupedLinks.length && <div className="empty-state"><span>⌕</span><h2>没有找到相关网站</h2><p>换个关键词试试，或添加一个新入口。</p><button onClick={() => { setQuery(""); setActiveCategory("全部"); }}>查看全部网站</button></div>}
-      </section>
+      <div className="workspace-layout">
+        <section className="navigation-area" aria-live="polite">
+          <div className="area-label"><span>NAVIGATION</span><p>Access your digital resources</p></div>
+          <div className="filters">{["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}</div>
+          <div className="directory">{groupedLinks.map((group) => <div className="category-section" key={group.category}><div className="section-heading"><h2>{group.category}</h2><span>{String(group.items.length).padStart(2, "0")}</span><div /></div><div className="card-grid">{group.items.map((link) => <a className="link-card" href={link.url} target="_blank" rel="noreferrer" key={link.id}><SiteIcon link={link} /><span className="card-copy"><strong>{link.title}</strong><small>{link.description}</small><span className="domain">{domainOf(link.url)}</span></span><span className="arrow">↗</span></a>)}</div></div>)}{!groupedLinks.length && <div className="empty-state"><span>⌕</span><h2>没有找到相关网站</h2><p>换个关键词试试，或添加一个新入口。</p><button onClick={() => { setQuery(""); setActiveCategory("全部"); }}>查看全部网站</button></div>}</div>
+        </section>
+        <aside className="workspace-area">
+          <div className="area-label"><span>WORKSPACE</span><p>Turn intention into action</p></div>
+          <section className="focus-panel" aria-labelledby="focus-title">
+            <div className="focus-head"><div><h2 id="focus-title">Today&apos;s Focus</h2><p>今天还有 <strong>{focusRemaining}</strong> 个安排</p></div><button type="button" className="focus-add" onClick={() => { setEditingEventId(null); setFocusComposerOpen((value) => !value); }}>{focusComposerOpen ? "收起" : "＋ Add"}</button></div>
+            <div className="progress-pair"><div><span>Today&apos;s Progress</span><strong>{focusCompleted} / {todayEvents.length}</strong><i><b style={{ width: `${focusProgress}%` }} /></i><small>{focusProgress}%</small></div><div><span>Weekly Progress</span><strong>{weeklyCompleted} / {weeklyEvents.length}</strong><i><b style={{ width: `${weeklyProgress}%` }} /></i><small>{weeklyProgress}%</small></div></div>
+            {focusComposerOpen && <form className="focus-form" onSubmit={saveFocusEvent}><input autoFocus value={focusForm.title} onChange={(e) => setFocusForm({ ...focusForm, title: e.target.value })} placeholder="任务标题" required /><input value={focusForm.category} onChange={(e) => setFocusForm({ ...focusForm, category: e.target.value })} placeholder="分类" /><label>开始<input type="time" value={focusForm.startTime} onChange={(e) => setFocusForm({ ...focusForm, startTime: e.target.value })} required /></label><label>结束<input type="time" value={focusForm.endTime} onChange={(e) => setFocusForm({ ...focusForm, endTime: e.target.value })} required /></label><select value={focusForm.priority} onChange={(e) => setFocusForm({ ...focusForm, priority: e.target.value as NexusEvent["priority"] })}><option>High</option><option>Medium</option><option>Low</option></select><select value={focusForm.type} onChange={(e) => setFocusForm({ ...focusForm, type: e.target.value as NexusEvent["type"] })}><option value="task">Task</option><option value="schedule">Schedule</option></select><button>{editingEventId ? "Save" : "Add"}</button></form>}
+            <div className="timeline"><p className="timeline-label">TIMELINE</p>{todayEvents.map((item) => <article className={`timeline-event ${item.status === "completed" ? "done" : ""}`} key={item.id}><time>{item.startTime}</time><div className="timeline-line"><i /></div><label><input type="checkbox" checked={item.status === "completed"} onChange={() => setEvents((items) => items.map((event) => event.id === item.id ? { ...event, status: event.status === "completed" ? "pending" : "completed" } : event))} /><span><strong>{item.type === "schedule" ? "▣" : "□"} {item.title}</strong><small>{item.startTime} - {item.endTime || `${item.duration} min`} · {item.category}</small></span></label><span className={`event-priority ${item.priority.toLowerCase()}`}>{item.priority.slice(0, 1)}</span><div className="event-actions"><button onClick={() => editFocusEvent(item)}>Edit</button><button onClick={() => setEvents((items) => items.filter((event) => event.id !== item.id))}>×</button></div></article>)}{!todayEvents.length && <p className="focus-empty">今天还没有安排。给自己留一点专注时间。</p>}</div>
+            <a className="open-calendar" href="/calendar">Open Calendar <span>→</span></a>
+          </section>
+        </aside>
+      </div>
       <footer><span><b>N</b> Nexus</span><p>所有个性化内容仅保存在你的浏览器中 · {links.length} 个快捷入口</p></footer>
 
       {settingsOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-label="管理导航">
