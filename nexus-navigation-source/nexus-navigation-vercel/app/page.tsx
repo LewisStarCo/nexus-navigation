@@ -223,7 +223,7 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <header className="topbar">
         <a className="brand" href="#top"><span className="brand-mark">N</span><span>Nexus</span></a>
-        <div className="top-actions"><label className="mini-search"><span className="search-icon" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选导航…" aria-label="筛选导航" />{query && <button onClick={() => setQuery("")}>×</button>}</label><button className="theme-toggle" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} aria-label="切换亮色和暗色">{theme === "dark" ? "☀" : "☾"}</button><button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button></div>
+        <div className="top-actions"><label className="mini-search"><span className="search-icon" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选导航…" aria-label="筛选导航" />{query && <button onClick={() => setQuery("")}>×</button>}</label><a className="github-link" href="https://github.com/LewisStarCo/nexus-navigation" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Nexus 项目说明" title="查看功能说明与项目源码"><img src="https://github.com/favicon.ico" alt="" /></a><button className="theme-toggle" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} aria-label="切换亮色和暗色">{theme === "dark" ? "☀" : "☾"}</button><button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button></div>
       </header>
 
       <section className="hero" id="top">
