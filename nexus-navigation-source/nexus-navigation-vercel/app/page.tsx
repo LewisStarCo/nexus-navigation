@@ -38,6 +38,12 @@ const defaultLinks: NavLink[] = rawLinks.map((item, index) => ({ id: `default-${
 function domainOf(url: string) { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } }
 function normalizeUrl(url: string) { return /^https?:\/\//i.test(url) ? url : `https://${url}`; }
 
+function SiteIcon({ link, small = false }: { link: NavLink; small?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  const host = domainOf(link.url);
+  return <span className={`${small ? "mini-mark" : "site-mark"} ${link.color} favicon-wrap`}>{!failed && <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`} alt="" onError={() => setFailed(true)} />}{failed && <span>{link.mark}</span>}</span>;
+}
+
 export default function Home() {
   const [links, setLinks] = useState<NavLink[]>(defaultLinks);
   const [categories, setCategories] = useState(defaultCategories);
@@ -49,6 +55,8 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [categoryDraft, setCategoryDraft] = useState("");
   const [now, setNow] = useState<Date | null>(null);
   const [ready, setReady] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", url: "", category: defaultCategories[0] });
@@ -116,6 +124,17 @@ export default function Home() {
     if (!value || categories.includes(value)) return;
     setCategories((items) => [...items, value]); setNewCategory(""); setForm((current) => ({ ...current, category: value }));
   }
+  function renameCategory(event: FormEvent, oldName: string) {
+    event.preventDefault();
+    const nextName = categoryDraft.trim();
+    if (!nextName || (nextName !== oldName && categories.includes(nextName))) return;
+    setCategories((items) => items.map((item) => item === oldName ? nextName : item));
+    setLinks((items) => items.map((item) => item.category === oldName ? { ...item, category: nextName } : item));
+    if (activeCategory === oldName) setActiveCategory(nextName);
+    setForm((current) => current.category === oldName ? { ...current, category: nextName } : current);
+    setEditingCategory(null);
+    setCategoryDraft("");
+  }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址和用户名将被清除。")) return;
     setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setActiveCategory("全部");
@@ -148,7 +167,7 @@ export default function Home() {
       <section className="directory" aria-live="polite">
         {groupedLinks.map((group) => <div className="category-section" key={group.category}>
           <div className="section-heading"><h2>{group.category}</h2><span>{String(group.items.length).padStart(2, "0")}</span><div /></div>
-          <div className="card-grid">{group.items.map((link) => <a className="link-card" href={link.url} target="_blank" rel="noreferrer" key={link.id}><span className={`site-mark ${link.color}`}>{link.mark}</span><span className="card-copy"><strong>{link.title}</strong><small>{link.description}</small><span className="domain">{domainOf(link.url)}</span></span><span className="arrow">↗</span></a>)}</div>
+          <div className="card-grid">{group.items.map((link) => <a className="link-card" href={link.url} target="_blank" rel="noreferrer" key={link.id}><SiteIcon link={link} /><span className="card-copy"><strong>{link.title}</strong><small>{link.description}</small><span className="domain">{domainOf(link.url)}</span></span><span className="arrow">↗</span></a>)}</div>
         </div>)}
         {!groupedLinks.length && <div className="empty-state"><span>⌕</span><h2>没有找到相关网站</h2><p>换个关键词试试，或添加一个新入口。</p><button onClick={() => { setQuery(""); setActiveCategory("全部"); }}>查看全部网站</button></div>}
       </section>
@@ -161,11 +180,11 @@ export default function Home() {
           <div className="manager-scroll">
             <section className="setting-section"><label className="field-label">你的名字</label><input className="field" value={username} onChange={(e) => setUsername(e.target.value.slice(0, 20))} placeholder="在这里填写用户名" /><p className="field-help">将显示在首页问候语中，随时可以修改。</p></section>
             <section className="setting-section"><div className="setting-title"><h3>时区与时钟</h3><span>{zones.length}</span></div><p className="field-help timezone-help">第一个时区是主时区，用于判断早上、中午或晚上。</p><div className="timezone-list">{zones.map((item, index) => <div key={`${item.zone}-${index}`}><p><strong>{item.label}</strong><small>{item.zone}</small></p>{index > 0 && <button onClick={() => setZones((items) => [item, ...items.filter((_, i) => i !== index)])}>设为主时区</button>}{zones.length > 1 && <button className="danger" onClick={() => setZones((items) => items.filter((_, i) => i !== index))}>删除</button>}</div>)}</div><div className="timezone-add"><select value={zoneToAdd} onChange={(e) => setZoneToAdd(e.target.value)}>{zoneOptions.filter((option, index, all) => all.findIndex((item) => item.zone === option.zone) === index).map((item) => <option value={item.zone} key={item.zone}>{item.label} · {item.zone}</option>)}</select><button onClick={() => { const item = zoneOptions.find((option) => option.zone === zoneToAdd); if (item && !zones.some((zone) => zone.zone === item.zone)) setZones((current) => [...current, item]); }}>添加时区</button></div></section>
-            <section className="setting-section"><div className="setting-title"><h3>分类</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => <div key={category}><span>{category}</span><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
+            <section className="setting-section"><div className="setting-title"><h3>分类</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div key={category}><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
             <section className="setting-section"><div className="setting-title"><h3>{editingId ? "编辑网址" : "添加网址"}</h3><span>{links.length}</span></div>
               {categories.length ? <form className="link-form" onSubmit={submitLink}><label>名称<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="例如：Wikipedia" required /></label><label>网址<input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" required /></label><label>说明<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="一句简短说明（可选）" /></label><label>分类<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><div className="form-actions">{editingId && <button type="button" className="ghost" onClick={() => { setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] }); }}>取消</button>}<button className="primary">{editingId ? "保存修改" : "添加到导航"}</button></div></form> : <p className="field-help">请先添加一个分类。</p>}
             </section>
-            <section className="setting-section"><div className="setting-title"><h3>已有网址</h3><span>{links.length}</span></div><div className="manage-links">{links.map((link) => <div key={link.id}><span className={`mini-mark ${link.color}`}>{link.mark}</span><p><strong>{link.title}</strong><small>{link.category}</small></p><button onClick={() => editLink(link)}>编辑</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></div>)}</div></section>
+            <section className="setting-section"><div className="setting-title"><h3>已有网址</h3><span>{links.length}</span></div><div className="manage-links">{links.map((link) => <div key={link.id}><SiteIcon link={link} small /><p><strong>{link.title}</strong><small>{link.category}</small></p><button onClick={() => editLink(link)}>编辑</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></div>)}</div></section>
             <button className="reset-button" onClick={resetAll}>恢复默认内容</button>
           </div>
         </aside>

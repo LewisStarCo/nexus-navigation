@@ -77,6 +77,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .link-card:hover { transform: translateY(-4px); border-color: rgba(141,168,255,.3); background: rgba(27,33,50,.88); }
 .link-card:hover::after { opacity: 1; }
 .site-mark { width: 41px; height: 41px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; font-weight: 750; font-size: 13px; border: 1px solid rgba(255,255,255,.1); }
+.favicon-wrap { overflow: hidden; }
+.favicon-wrap img { width: 25px; height: 25px; object-fit: contain; border-radius: 5px; }
+.mini-mark.favicon-wrap img { width: 19px; height: 19px; border-radius: 4px; }
 .card-copy { display: flex; flex-direction: column; min-width: 0; padding-top: 1px; }
 .card-copy strong { font-size: 14px; font-weight: 650; margin-bottom: 7px; }
 .card-copy small { color: #7f8799; font-size: 12px; line-height: 1.4; }
@@ -122,6 +125,9 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
 .category-list > div { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px 7px 10px; display: flex; align-items: center; gap: 8px; color: #aab1c0; font-size: 11px; }
 .category-list button { border: 0; background: transparent; color: #5f687b; padding: 0; cursor: pointer; font-size: 9px; }
 .category-list button:hover { color: #ff8898; }
+.category-list button.rename-category:hover, .category-list button.save-category { color: #aebefd; }
+.category-edit { width: 100%; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(141,168,255,.3); border-radius: 9px; padding: 6px; background: rgba(141,168,255,.05); }
+.category-edit input { flex: 1; min-width: 0; height: 30px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: #171c2a; color: white; padding: 0 8px; outline: none; font-size: 11px; }
 .inline-form { display: flex; gap: 8px; margin-top: 11px; }
 .inline-form button, .primary { border: 0; border-radius: 9px; color: #101521; background: #9eb4fa; padding: 0 16px; cursor: pointer; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .link-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; }
