@@ -110,7 +110,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine, events }));
+    if (ready) {
+      try {
+        const existing = JSON.parse(localStorage.getItem("nexus-data-v1") || "{}");
+        localStorage.setItem("nexus-data-v1", JSON.stringify({ ...existing, links, categories, username, zones, theme, searchEngine, events }));
+      } catch { localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine, events })); }
+    }
   }, [links, categories, username, zones, theme, searchEngine, events, ready]);
 
   useEffect(() => {
