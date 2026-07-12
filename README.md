@@ -245,6 +245,15 @@ nexus-navigation-source/
 
 ## 开发者日志
 
+### v14 · Visible date-range import
+
+- Import File 页面增加与账户连接一致的开始日期和结束日期控件。
+- ICS、CSV 和 JSON 只预览并导入用户选择范围内的项目。
+- 移除选择文件后的临时日期输入弹窗，减少重复操作。
+- 增加 Google Calendar、Outlook Calendar 和 Microsoft To Do 的账户授权入口。
+- Import 界面增加 README 教程链接。
+- 明确说明 Mac、iPhone 和 iPad 的 Apple Calendar 导入限制。
+
 ### v12 · Calendar import
 
 - Calendar 增加外部日程导入入口。
