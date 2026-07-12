@@ -64,7 +64,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .search-box input::placeholder { color: #646c80; }
 .search-box kbd { color: #697185; border: 1px solid var(--line); background: rgba(255,255,255,.035); border-radius: 7px; padding: 5px 8px; font-size: 11px; }
 .search-box button { border: 0; background: transparent; color: #8c94a7; cursor: pointer; font-size: 24px; padding: 0 4px; }
-.google-g { font: 700 20px/1 Arial; color: #8da8ff; width: 21px; text-align: center; }
+.engine-badge { color: #a9baff; background: rgba(141,168,255,.11); border: 1px solid rgba(141,168,255,.18); border-radius: 7px; min-width: 29px; height: 29px; padding: 0 5px; display: grid; place-items: center; font-size: 9px; font-weight: 700; }
 .search-box button.google-submit { font-size: 17px; color: #92a8ee; order: 3; }
 .search-box kbd { order: 4; }
 
@@ -136,6 +136,7 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
 .theme-light .modal-backdrop { background: rgba(225,229,239,.68); }
 .theme-light .manager { background: #f9faff; color: #252c3c; }
 .theme-light .field, .theme-light .link-form input, .theme-light .link-form select, .theme-light .inline-form input, .theme-light .category-edit input, .theme-light .timezone-add select { background: white; color: #252c3c; border-color: rgba(55,72,110,.15); }
+.theme-light .custom-engine input { background: white; color: #252c3c; border-color: rgba(55,72,110,.15); }
 .theme-light .manage-links > div, .theme-light .timezone-list > div { background: rgba(255,255,255,.7); }
 
 .modal-layer { position: fixed; inset: 0; z-index: 20; display: flex; justify-content: flex-end; }
@@ -183,6 +184,13 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
 .manage-links button.danger:hover { color: #ff899a; }
 .reset-button { width: 100%; height: 42px; margin-top: 22px; border: 1px solid rgba(224,74,94,.17); background: rgba(224,74,94,.05); color: #a86470; border-radius: 10px; font-size: 11px; cursor: pointer; }
 .reset-button:hover { color: #ef8797; border-color: rgba(224,74,94,.32); }
+.engine-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.engine-options button { border: 1px solid var(--line); background: rgba(255,255,255,.025); color: #7e879b; border-radius: 999px; padding: 8px 12px; font-size: 10px; cursor: pointer; }
+.engine-options button.selected { color: #b8c6f4; border-color: rgba(141,168,255,.38); background: rgba(141,168,255,.1); }
+.custom-engine { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.custom-engine input { min-width: 0; height: 40px; border: 1px solid rgba(255,255,255,.11); background: #171c2a; color: white; border-radius: 9px; padding: 0 10px; outline: none; font-size: 9px; }
+.custom-engine button { grid-column: 1 / -1; height: 36px; border: 0; border-radius: 9px; background: rgba(141,168,255,.13); color: #aebefd; cursor: pointer; font-size: 10px; }
+.field-help code { color: #8297da; }
 .timezone-help { margin: -6px 0 12px; }
 .timezone-list { display: grid; gap: 6px; }
 .timezone-list > div { min-height: 50px; border: 1px solid rgba(255,255,255,.06); background: rgba(255,255,255,.02); border-radius: 9px; padding: 8px 9px; display: flex; align-items: center; gap: 7px; }

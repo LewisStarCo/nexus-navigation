@@ -4,10 +4,17 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type NavLink = { id: string; title: string; description: string; url: string; category: string; mark: string; color: string };
 type ClockZone = { label: string; zone: string };
+type SearchEngine = { label: string; url: string };
 
 const defaultCategories = ["复旦学习", "AI 工具", "编程开发", "知识资源"];
 const palette = ["blue", "indigo", "violet", "cyan", "sky", "teal", "emerald", "amber", "orange", "rose", "purple", "pink"];
 const defaultZones: ClockZone[] = [{ label: "北京时间", zone: "Asia/Shanghai" }, { label: "旧金山时间", zone: "America/Los_Angeles" }];
+const searchEngines: SearchEngine[] = [
+  { label: "Google", url: "https://www.google.com/search?q={query}" },
+  { label: "百度", url: "https://www.baidu.com/s?wd={query}" },
+  { label: "Bing", url: "https://www.bing.com/search?q={query}" },
+  { label: "DuckDuckGo", url: "https://duckduckgo.com/?q={query}" },
+];
 const zoneOptions: ClockZone[] = [
   { label: "本地时间", zone: Intl.DateTimeFormat().resolvedOptions().timeZone },
   { label: "北京时间", zone: "Asia/Shanghai" }, { label: "东京时间", zone: "Asia/Tokyo" },
@@ -50,6 +57,8 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [zones, setZones] = useState<ClockZone[]>(defaultZones);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [searchEngine, setSearchEngine] = useState<SearchEngine>(searchEngines[0]);
+  const [customEngine, setCustomEngine] = useState<SearchEngine>({ label: "", url: "" });
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
   const [query, setQuery] = useState("");
   const [googleQuery, setGoogleQuery] = useState("");
@@ -74,6 +83,7 @@ export default function Home() {
         if (typeof data.username === "string") setUsername(data.username);
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
         if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
+        if (data.searchEngine?.label && data.searchEngine?.url) setSearchEngine(data.searchEngine);
       }
     } catch { /* Keep defaults if saved data is unavailable. */ }
     setReady(true);
@@ -83,8 +93,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme }));
-  }, [links, categories, username, zones, theme, ready]);
+    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine }));
+  }, [links, categories, username, zones, theme, searchEngine, ready]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -151,7 +161,7 @@ export default function Home() {
   function searchGoogle(event: FormEvent) {
     event.preventDefault();
     const value = googleQuery.trim();
-    if (value) window.open(`https://www.google.com/search?q=${encodeURIComponent(value)}`, "_blank", "noopener,noreferrer");
+    if (value) window.open(searchEngine.url.replace("{query}", encodeURIComponent(value)), "_blank", "noopener,noreferrer");
   }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址和用户名将被清除。")) return;
@@ -176,7 +186,7 @@ export default function Home() {
         </div>
         {!username && <button className="name-prompt" onClick={() => setSettingsOpen(true)}>填写你的名字，让这里更像你的主页 →</button>}
         <p className="intro">学习、思考、创造。把每天常用的网站收进一个安静、好用的入口。</p>
-        <form className="search-box" onSubmit={searchGoogle}><span className="google-g">G</span><input id="google-search" value={googleQuery} onChange={(e) => setGoogleQuery(e.target.value)} placeholder="用 Google 搜索互联网…" aria-label="Google 搜索" /><button className="google-submit" type="submit" aria-label="搜索">↗</button><kbd>⌘ K</kbd></form>
+        <form className="search-box" onSubmit={searchGoogle}><span className="engine-badge">{searchEngine.label.slice(0, 2)}</span><input id="google-search" value={googleQuery} onChange={(e) => setGoogleQuery(e.target.value)} placeholder={`用 ${searchEngine.label} 搜索互联网…`} aria-label={`${searchEngine.label} 搜索`} /><button className="google-submit" type="submit" aria-label="搜索">↗</button><kbd>⌘ K</kbd></form>
         <div className="filters">
           {["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}
         </div>
@@ -197,6 +207,7 @@ export default function Home() {
           <div className="manager-head"><div><small>PERSONALIZE</small><h2>管理导航</h2></div><button onClick={() => setSettingsOpen(false)}>×</button></div>
           <div className="manager-scroll">
             <section className="setting-section"><label className="field-label">你的名字</label><input className="field" value={username} onChange={(e) => setUsername(e.target.value.slice(0, 20))} placeholder="在这里填写用户名" /><p className="field-help">将显示在首页问候语中，随时可以修改。</p></section>
+            <section className="setting-section"><div className="setting-title"><h3>默认搜索引擎</h3><span>{searchEngine.label}</span></div><div className="engine-options">{searchEngines.map((engine) => <button className={searchEngine.url === engine.url ? "selected" : ""} key={engine.url} onClick={() => setSearchEngine(engine)}>{engine.label}</button>)}</div><div className="custom-engine"><input value={customEngine.label} onChange={(e) => setCustomEngine({ ...customEngine, label: e.target.value })} placeholder="自定义名称" /><input value={customEngine.url} onChange={(e) => setCustomEngine({ ...customEngine, url: e.target.value })} placeholder="https://example.com/search?q={query}" /><button onClick={() => { if (customEngine.label.trim() && customEngine.url.includes("{query}")) setSearchEngine({ label: customEngine.label.trim(), url: customEngine.url.trim() }); }}>使用自定义</button></div><p className="field-help">自定义地址必须包含 <code>{"{query}"}</code>，它会被替换成搜索内容。</p></section>
             <section className="setting-section"><div className="setting-title"><h3>时区与时钟</h3><span>{zones.length}</span></div><p className="field-help timezone-help">第一个时区是主时区，用于判断早上、中午或晚上。</p><div className="timezone-list">{zones.map((item, index) => <div key={`${item.zone}-${index}`}><p><strong>{item.label}</strong><small>{item.zone}</small></p>{index > 0 && <button onClick={() => setZones((items) => [item, ...items.filter((_, i) => i !== index)])}>设为主时区</button>}{zones.length > 1 && <button className="danger" onClick={() => setZones((items) => items.filter((_, i) => i !== index))}>删除</button>}</div>)}</div><div className="timezone-add"><select value={zoneToAdd} onChange={(e) => setZoneToAdd(e.target.value)}>{zoneOptions.filter((option, index, all) => all.findIndex((item) => item.zone === option.zone) === index).map((item) => <option value={item.zone} key={item.zone}>{item.label} · {item.zone}</option>)}</select><button onClick={() => { const item = zoneOptions.find((option) => option.zone === zoneToAdd); if (item && !zones.some((zone) => zone.zone === item.zone)) setZones((current) => [...current, item]); }}>添加时区</button></div></section>
             <section className="setting-section"><div className="setting-title"><h3>分类 · 拖动调整顺序</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div className={draggedCategory === category ? "dragging" : ""} draggable key={category} onDragStart={() => setDraggedCategory(category)} onDragOver={(e) => e.preventDefault()} onDrop={() => moveCategory(category)} onDragEnd={() => setDraggedCategory(null)}><b className="drag-handle">⠿</b><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
             <section className="setting-section"><div className="setting-title"><h3>{editingId ? "编辑网址" : "添加网址"}</h3><span>{links.length}</span></div>
