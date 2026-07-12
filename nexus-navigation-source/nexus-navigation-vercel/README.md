@@ -220,6 +220,12 @@ next.config.ts         # Next.js 配置
 
 ## 开发者日志
 
+### v14 · Visible date-range import
+
+- 文件导入页面增加可见的开始与结束日期控件。
+- Google/Microsoft 账户连接与文件导入共用日期范围逻辑。
+- 增加导入帮助链接和 Apple Calendar 平台限制说明。
+
 ### v12 · Calendar import
 
 - 增加 Apple Calendar、Google Calendar 和 Outlook ICS 导入。
