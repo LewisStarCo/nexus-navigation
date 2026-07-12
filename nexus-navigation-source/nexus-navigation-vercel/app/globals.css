@@ -68,6 +68,35 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .search-box button.google-submit { font-size: 17px; color: #92a8ee; order: 3; }
 .search-box kbd { order: 4; }
 
+.focus-panel { width: min(100%, 760px); margin-top: 22px; padding: 17px 18px 14px; border: 1px solid var(--line); border-radius: 17px; background: rgba(18,23,36,.68); backdrop-filter: blur(14px); }
+.focus-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.focus-head h2 { margin: 0; color: #e9edf8; font-size: 14px; letter-spacing: -.01em; }
+.focus-head p { margin: 4px 0 0; color: #687188; font-size: 10px; }
+.focus-head p strong { color: #a9baff; }
+.focus-add { border: 1px solid rgba(141,168,255,.22); background: rgba(141,168,255,.08); color: #9eb2f0; border-radius: 8px; padding: 7px 10px; font-size: 10px; cursor: pointer; }
+.focus-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 13px; max-height: 185px; overflow-y: auto; }
+.focus-task { min-width: 0; min-height: 60px; display: flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.065); background: rgba(255,255,255,.025); border-radius: 11px; padding: 9px 8px 9px 10px; }
+.focus-task label { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; cursor: pointer; }
+.focus-task input { accent-color: #8da8ff; width: 15px; height: 15px; margin: 0; flex: 0 0 auto; }
+.focus-task label span { display: grid; gap: 4px; min-width: 0; }
+.focus-task label strong { color: #dce1ed; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-task label small { color: #646d82; font-size: 9px; }
+.focus-task.done label strong { color: #60697d; text-decoration: line-through; }
+.focus-task.done { opacity: .68; }
+.priority { min-width: 19px; height: 19px; display: grid; place-items: center; border-radius: 6px; font-size: 8px; flex: 0 0 auto; }
+.priority-高 { color: #ff9ead; background: rgba(226,74,101,.13); }.priority-中 { color: #f2c77f; background: rgba(211,149,48,.12); }.priority-低 { color: #87d7bb; background: rgba(56,172,131,.12); }
+.focus-delete { width: 18px; height: 22px; padding: 0; border: 0; background: transparent; color: #535d72; cursor: pointer; font-size: 15px; }
+.focus-delete:hover { color: #ff8798; }
+.focus-empty { grid-column: 1 / -1; margin: 3px 0; color: #646d82; font-size: 10px; }
+.focus-progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 13px; color: #6e778b; font-size: 9px; }
+.focus-progress > div { height: 4px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.07); }
+.focus-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6f8de8, #9ab0f5); transition: width .3s ease; }
+.focus-progress strong { color: #9aabd9; font: 9px monospace; }
+.focus-form { display: grid; grid-template-columns: 2fr 1fr 78px 100px auto; gap: 7px; margin-top: 13px; }
+.focus-form input, .focus-form select { min-width: 0; height: 34px; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; outline: none; background: #151a28; color: #dce1ed; padding: 0 9px; font-size: 9px; }
+.focus-form input:focus, .focus-form select:focus { border-color: rgba(141,168,255,.5); }
+.focus-form button { border: 0; border-radius: 8px; background: #9eb4fa; color: #101521; font-size: 9px; font-weight: 700; padding: 0 12px; cursor: pointer; }
+
 .filters { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
 .filters button { border: 1px solid var(--line); background: rgba(255,255,255,.025); color: #858da1; border-radius: 999px; padding: 12px 18px; font-size: 13px; cursor: pointer; display: flex; gap: 10px; align-items: center; transition: .2s ease; }
 .filters button span { font-size: 10px; color: #626b7e; }
@@ -121,6 +150,11 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
 .theme-light .brand-mark { border-color: rgba(40,55,90,.2); background: white; }
 .theme-light .manage-button, .theme-light .theme-toggle { color: #536382; background: rgba(255,255,255,.72); border-color: rgba(55,72,110,.16); }
 .theme-light .mini-search, .theme-light .search-box { background: rgba(255,255,255,.88); border-color: rgba(55,72,110,.16); box-shadow: 0 18px 55px rgba(63,78,115,.1); }
+.theme-light .focus-panel { background: rgba(255,255,255,.72); border-color: rgba(55,72,110,.13); box-shadow: 0 12px 38px rgba(63,78,115,.06); }
+.theme-light .focus-head h2, .theme-light .focus-task label strong { color: #293144; }
+.theme-light .focus-task { background: rgba(247,248,252,.85); border-color: rgba(55,72,110,.09); }
+.theme-light .focus-form input, .theme-light .focus-form select { background: white; color: #293144; border-color: rgba(55,72,110,.15); }
+.theme-light .focus-progress > div { background: rgba(55,72,110,.1); }
 .theme-light .mini-search input, .theme-light .search-box input { color: #202636; }
 .theme-light .hero h1 { color: #181e2b; }
 .theme-light .hero h1 em { color: #526fce; }
@@ -225,6 +259,11 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
   .intro { font-size: 14px; max-width: 310px; }
   .search-box { height: 57px; }
   .search-box kbd { display: none; }
+  .focus-panel { padding: 15px 14px 12px; }
+  .focus-list { grid-template-columns: 1fr; max-height: 210px; }
+  .focus-form { grid-template-columns: 1fr 1fr; }
+  .focus-form input:first-child { grid-column: 1 / -1; }
+  .focus-form button { height: 34px; }
   .filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -18px; padding-right: 18px; scrollbar-width: none; }
   .filters::-webkit-scrollbar { display: none; }
   .filters button { white-space: nowrap; }

@@ -5,10 +5,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type NavLink = { id: string; title: string; description: string; url: string; category: string; mark: string; color: string };
 type ClockZone = { label: string; zone: string };
 type SearchEngine = { label: string; url: string };
+type FocusTask = { id: string; title: string; category: string; minutes: number; priority: "高" | "中" | "低"; completed: boolean };
 
 const defaultCategories = ["复旦学习", "AI 工具", "编程开发", "知识资源"];
 const palette = ["blue", "indigo", "violet", "cyan", "sky", "teal", "emerald", "amber", "orange", "rose", "purple", "pink"];
 const defaultZones: ClockZone[] = [{ label: "北京时间", zone: "Asia/Shanghai" }, { label: "旧金山时间", zone: "America/Los_Angeles" }];
+const defaultFocusTasks: FocusTask[] = [
+  { id: "focus-rust", title: "学习 Rust 所有权章节", category: "编程", minutes: 90, priority: "高", completed: false },
+  { id: "focus-algebra", title: "复习线性代数", category: "数学", minutes: 60, priority: "中", completed: false },
+  { id: "focus-paper", title: "阅读一篇 AI 论文", category: "科研", minutes: 45, priority: "低", completed: false },
+];
 const searchEngines: SearchEngine[] = [
   { label: "Google", url: "https://www.google.com/search?q={query}" },
   { label: "百度", url: "https://www.baidu.com/s?wd={query}" },
@@ -58,6 +64,9 @@ export default function Home() {
   const [zones, setZones] = useState<ClockZone[]>(defaultZones);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [searchEngine, setSearchEngine] = useState<SearchEngine>(searchEngines[0]);
+  const [focusTasks, setFocusTasks] = useState<FocusTask[]>(defaultFocusTasks);
+  const [focusComposerOpen, setFocusComposerOpen] = useState(false);
+  const [focusForm, setFocusForm] = useState({ title: "", category: "", minutes: "", priority: "中" as FocusTask["priority"] });
   const [customEngine, setCustomEngine] = useState<SearchEngine>({ label: "", url: "" });
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
   const [query, setQuery] = useState("");
@@ -84,6 +93,7 @@ export default function Home() {
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
         if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
         if (data.searchEngine?.label && data.searchEngine?.url) setSearchEngine(data.searchEngine);
+        if (Array.isArray(data.focusTasks)) setFocusTasks(data.focusTasks);
       }
     } catch { /* Keep defaults if saved data is unavailable. */ }
     setReady(true);
@@ -93,8 +103,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine }));
-  }, [links, categories, username, zones, theme, searchEngine, ready]);
+    if (ready) localStorage.setItem("nexus-data-v1", JSON.stringify({ links, categories, username, zones, theme, searchEngine, focusTasks }));
+  }, [links, categories, username, zones, theme, searchEngine, focusTasks, ready]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -112,6 +122,9 @@ export default function Home() {
     return links.filter((link) => (activeCategory === "全部" || link.category === activeCategory) && (!needle || `${link.title} ${link.description} ${link.url}`.toLowerCase().includes(needle)));
   }, [links, query, activeCategory]);
   const groupedLinks = categories.map((category) => ({ category, items: visibleLinks.filter((link) => link.category === category) })).filter((group) => group.items.length);
+  const focusCompleted = focusTasks.filter((task) => task.completed).length;
+  const focusRemaining = focusTasks.length - focusCompleted;
+  const focusProgress = focusTasks.length ? Math.round((focusCompleted / focusTasks.length) * 100) : 0;
 
   const primaryHour = now ? Number(new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", hour12: false, timeZone: zones[0]?.zone }).formatToParts(now).find((part) => part.type === "hour")?.value ?? now.getHours()) : 12;
   const greeting = !now ? "你好" : primaryHour < 11 ? "早上好" : primaryHour < 14 ? "中午好" : primaryHour < 18 ? "下午好" : "晚上好";
@@ -163,9 +176,18 @@ export default function Home() {
     const value = googleQuery.trim();
     if (value) window.open(searchEngine.url.replace("{query}", encodeURIComponent(value)), "_blank", "noopener,noreferrer");
   }
+  function addFocusTask(event: FormEvent) {
+    event.preventDefault();
+    const title = focusForm.title.trim();
+    const minutes = Number(focusForm.minutes);
+    if (!title || !Number.isFinite(minutes) || minutes < 1) return;
+    setFocusTasks((items) => [...items, { id: crypto.randomUUID(), title, category: focusForm.category.trim() || "其他", minutes: Math.round(minutes), priority: focusForm.priority, completed: false }]);
+    setFocusForm({ title: "", category: "", minutes: "", priority: "中" });
+    setFocusComposerOpen(false);
+  }
   function resetAll() {
-    if (!confirm("恢复默认内容？你添加的分类、网址和用户名将被清除。")) return;
-    setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setActiveCategory("全部");
+    if (!confirm("恢复默认内容？你添加的分类、网址、任务和用户名将被清除。")) return;
+    setLinks(defaultLinks); setCategories(defaultCategories); setUsername(""); setZones(defaultZones); setFocusTasks(defaultFocusTasks); setActiveCategory("全部");
   }
 
   return (
@@ -187,6 +209,15 @@ export default function Home() {
         {!username && <button className="name-prompt" onClick={() => setSettingsOpen(true)}>填写你的名字，让这里更像你的主页 →</button>}
         <p className="intro">学习、思考、创造。把每天常用的网站收进一个安静、好用的入口。</p>
         <form className="search-box" onSubmit={searchGoogle}><span className="engine-badge">{searchEngine.label.slice(0, 2)}</span><input id="google-search" value={googleQuery} onChange={(e) => setGoogleQuery(e.target.value)} placeholder={`用 ${searchEngine.label} 搜索互联网…`} aria-label={`${searchEngine.label} 搜索`} /><button className="google-submit" type="submit" aria-label="搜索">↗</button><kbd>⌘ K</kbd></form>
+        <section className="focus-panel" aria-labelledby="focus-title">
+          <div className="focus-head"><div><h2 id="focus-title">Today&apos;s Focus</h2><p>今天还有 <strong>{focusRemaining}</strong> 个任务</p></div><button type="button" className="focus-add" onClick={() => setFocusComposerOpen((value) => !value)}>{focusComposerOpen ? "收起" : "＋ 添加任务"}</button></div>
+          {focusComposerOpen && <form className="focus-form" onSubmit={addFocusTask}><input autoFocus value={focusForm.title} onChange={(e) => setFocusForm({ ...focusForm, title: e.target.value })} placeholder="任务名称" required /><input value={focusForm.category} onChange={(e) => setFocusForm({ ...focusForm, category: e.target.value })} placeholder="分类，如编程" /><input type="number" min="1" max="1440" value={focusForm.minutes} onChange={(e) => setFocusForm({ ...focusForm, minutes: e.target.value })} placeholder="分钟" required /><select value={focusForm.priority} onChange={(e) => setFocusForm({ ...focusForm, priority: e.target.value as FocusTask["priority"] })}><option value="高">高优先级</option><option value="中">中优先级</option><option value="低">低优先级</option></select><button>添加</button></form>}
+          <div className="focus-list">
+            {focusTasks.map((task) => <article className={`focus-task ${task.completed ? "done" : ""}`} key={task.id}><label><input type="checkbox" checked={task.completed} onChange={() => setFocusTasks((items) => items.map((item) => item.id === task.id ? { ...item, completed: !item.completed } : item))} /><span><strong>{task.title}</strong><small>{task.category} · {task.minutes}分钟</small></span></label><span className={`priority priority-${task.priority}`}>{task.priority}</span><button className="focus-delete" type="button" aria-label={`删除${task.title}`} onClick={() => setFocusTasks((items) => items.filter((item) => item.id !== task.id))}>×</button></article>)}
+            {!focusTasks.length && <p className="focus-empty">今天还没有任务，给自己安排一个小目标吧。</p>}
+          </div>
+          <div className="focus-progress"><span>今日完成度</span><div><i style={{ width: `${focusProgress}%` }} /></div><strong>{focusProgress}%</strong></div>
+        </section>
         <div className="filters">
           {["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}
         </div>
