@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Nexus Save",
-  "version": "1.0.0",
-  "description": "在 Microsoft Edge 中把当前网页直接保存到 Nexus 分类、未归类或临时网页。",
+  "version": "1.1.0",
+  "description": "在 Microsoft Edge 中把当前 Website 保存为 Nexus Resource，并选择正式分类、未归类或临时资源。",
   "permissions": [
     "activeTab",
     "storage"
