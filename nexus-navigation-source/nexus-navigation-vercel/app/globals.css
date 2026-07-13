@@ -290,6 +290,32 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
 .theme-light .timeline-event label strong { color: #30384b; }
 .theme-light .workspace-area .focus-form { background: rgba(247,248,252,.7); }
 
+/* Compact focus composer */
+.workspace-area .progress-pair { gap: 8px; margin: 16px 0; padding-bottom: 0; border-bottom: 0; }
+.workspace-area .progress-pair > div { padding: 10px; border: 1px solid rgba(255,255,255,.055); border-radius: 10px; background: rgba(255,255,255,.018); }
+.workspace-area .focus-form { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 0; margin: 0 0 17px; border: 0; background: transparent; }
+.focus-form-section { min-width: 0; padding: 11px; border: 1px solid rgba(255,255,255,.065); border-radius: 11px; background: rgba(255,255,255,.018); }
+.focus-form-caption { display: block; grid-column: 1 / -1; margin-bottom: 8px; color: #66728c; font: 700 7px/1 monospace; letter-spacing: .13em; text-transform: uppercase; }
+.focus-form-main { display: grid; grid-template-columns: 1.45fr 1fr; gap: 7px; }
+.focus-form-main .focus-form-caption { grid-column: 1 / -1; }
+.workspace-area .focus-form input, .workspace-area .focus-form select { width: 100%; height: 36px; border-radius: 8px; font-size: 9px; }
+.focus-time-grid, .focus-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.workspace-area .focus-form label { gap: 6px; color: #68748d; font-size: 8px; }
+.focus-repeat { display: grid; gap: 8px; }
+.repeat-choice { width: 100%; }
+.repeat-details { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.repeat-details label { display: grid !important; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px !important; padding: 0 8px; border: 1px solid rgba(255,255,255,.07); border-radius: 8px; }
+.repeat-details label input { height: 34px !important; padding: 0 !important; border: 0 !important; background: transparent !important; text-align: center; }
+.repeat-details small { color: #59647a; font-size: 7px; }
+.focus-repeat p { margin: 0; color: #59647a; font-size: 7px; line-height: 1.45; }
+.focus-form-actions { display: flex; justify-content: flex-end; gap: 7px; padding-top: 2px; }
+.workspace-area .focus-form .focus-form-actions button { min-height: 36px; padding: 0 13px; }
+.focus-cancel { border: 1px solid var(--line) !important; background: transparent !important; color: #748096 !important; font-weight: 500 !important; }
+.focus-submit { min-width: 105px; }
+.theme-light .workspace-area .progress-pair > div, .theme-light .focus-form-section { background: rgba(255,255,255,.78); border-color: rgba(55,72,110,.1); }
+.theme-light .workspace-area .focus-form { background: transparent; }
+.theme-light .repeat-details label { border-color: rgba(55,72,110,.12); background: #f7f9ff; }
+
 @media (max-width: 900px) {
   .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero { padding-top: 70px; }
@@ -320,6 +346,7 @@ footer b { color: #b8c5ee; border: 1px solid #434c62; width: 24px; height: 24px;
   .focus-form { grid-template-columns: 1fr 1fr; }
   .focus-form input:first-child { grid-column: 1 / -1; }
   .focus-form button { height: 34px; }
+  .focus-form-main { grid-template-columns: 1fr; }
   .workspace-layout { gap: 46px; }
   .navigation-area .card-grid { grid-template-columns: 1fr; }
   .filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -18px; padding-right: 18px; scrollbar-width: none; }

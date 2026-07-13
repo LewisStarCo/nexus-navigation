@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type NavLink = { id: string; title: string; description: string; url: string; category: string; mark: string; color: string };
 type ClockZone = { label: string; zone: string };
 type SearchEngine = { label: string; url: string };
-type NexusEvent = { id: string; title: string; category: string; priority: "High" | "Medium" | "Low"; type: "task" | "schedule"; date: string; startTime: string; endTime: string; duration: number; status: "pending" | "completed" | "unfinished"; source: "local" | "calendar" | "google-calendar" | "outlook-calendar" | "apple-calendar" | "ai-suggestion" };
+type NexusEvent = { id: string; title: string; category: string; priority: "High" | "Medium" | "Low"; type: "task" | "schedule"; date: string; startTime: string; endTime: string; duration: number; status: "pending" | "completed" | "unfinished"; source: "local" | "calendar" | "google-calendar" | "outlook-calendar" | "apple-calendar" | "microsoft-todo" | "ai-suggestion"; recurrence?: { unit: "week" | "month"; interval: number; count: number; seriesId: string } };
 
 const defaultCategories = ["复旦学习", "AI 工具", "编程开发", "知识资源"];
 const palette = ["blue", "indigo", "violet", "cyan", "sky", "teal", "emerald", "amber", "orange", "rose", "purple", "pink"];
@@ -69,7 +69,7 @@ export default function Home() {
   const [events, setEvents] = useState<NexusEvent[]>(createDefaultEvents);
   const [focusComposerOpen, setFocusComposerOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [focusForm, setFocusForm] = useState({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium" as NexusEvent["priority"], type: "task" as NexusEvent["type"] });
+  const [focusForm, setFocusForm] = useState({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium" as NexusEvent["priority"], type: "task" as NexusEvent["type"], repeatUnit: "none" as "none" | "week" | "month", repeatInterval: 1, repeatCount: 8 });
   const [customEngine, setCustomEngine] = useState<SearchEngine>({ label: "", url: "" });
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
   const [query, setQuery] = useState("");
@@ -207,12 +207,23 @@ export default function Home() {
     const duration = Math.max(1, (eh * 60 + em) - (sh * 60 + sm));
     const next = { title, category: focusForm.category.trim() || "其他", startTime: focusForm.startTime, endTime: focusForm.endTime, duration, priority: focusForm.priority, type: focusForm.type };
     if (editingEventId) setEvents((items) => items.map((item) => item.id === editingEventId ? { ...item, ...next } : item));
-    else setEvents((items) => [...items, { ...next, id: crypto.randomUUID(), date: localDate(), status: "pending", source: "local" }]);
+    else {
+      const count = focusForm.repeatUnit === "none" ? 1 : Math.max(1, Math.min(52, Number(focusForm.repeatCount) || 1));
+      const interval = Math.max(1, Math.min(52, Number(focusForm.repeatInterval) || 1));
+      const seriesId = crypto.randomUUID();
+      const additions: NexusEvent[] = Array.from({ length: count }, (_, index) => {
+        const date = new Date(`${localDate()}T12:00:00`);
+        if (focusForm.repeatUnit === "week") date.setDate(date.getDate() + index * interval * 7);
+        if (focusForm.repeatUnit === "month") date.setMonth(date.getMonth() + index * interval);
+        return { ...next, id: crypto.randomUUID(), date: localDate(date), status: "pending", source: "local", ...(focusForm.repeatUnit !== "none" ? { recurrence: { unit: focusForm.repeatUnit, interval, count, seriesId } } : {}) };
+      });
+      setEvents((items) => [...items, ...additions]);
+    }
     setEditingEventId(null);
-    setFocusForm({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium", type: "task" });
+    setFocusForm({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium", type: "task", repeatUnit: "none", repeatInterval: 1, repeatCount: 8 });
     setFocusComposerOpen(false);
   }
-  function editFocusEvent(item: NexusEvent) { setEditingEventId(item.id); setFocusForm({ title: item.title, category: item.category, startTime: item.startTime, endTime: item.endTime || item.startTime, priority: item.priority, type: item.type }); setFocusComposerOpen(true); }
+  function editFocusEvent(item: NexusEvent) { setEditingEventId(item.id); setFocusForm({ title: item.title, category: item.category, startTime: item.startTime, endTime: item.endTime || item.startTime, priority: item.priority, type: item.type, repeatUnit: "none", repeatInterval: 1, repeatCount: 1 }); setFocusComposerOpen(true); }
   function resetAll() {
     if (!confirm("恢复默认内容？你添加的分类、网址、任务和用户名将被清除。")) return;
     setLinks(defaultLinks); setCategories(defaultCategories); setForm({ title: "", description: "", url: "", category: defaultCategories[0] }); setUsername(""); setZones(defaultZones); setEvents(createDefaultEvents()); setActiveCategory("全部");
@@ -250,7 +261,13 @@ export default function Home() {
           <section className="focus-panel" aria-labelledby="focus-title">
             <div className="focus-head"><div><h2 id="focus-title">Today&apos;s Focus</h2><p>今天还有 <strong>{focusRemaining}</strong> 个安排</p></div><button type="button" className="focus-add" onClick={() => { setEditingEventId(null); setFocusComposerOpen((value) => !value); }}>{focusComposerOpen ? "收起" : "＋ Add"}</button></div>
             <div className="progress-pair"><div><span>Today&apos;s Progress</span><strong>{focusCompleted} / {todayEvents.length}</strong><i><b style={{ width: `${focusProgress}%` }} /></i><small>{focusProgress}%</small></div><div><span>Weekly Progress</span><strong>{weeklyCompleted} / {weeklyEvents.length}</strong><i><b style={{ width: `${weeklyProgress}%` }} /></i><small>{weeklyProgress}%</small></div></div>
-            {focusComposerOpen && <form className="focus-form" onSubmit={saveFocusEvent}><input autoFocus value={focusForm.title} onChange={(e) => setFocusForm({ ...focusForm, title: e.target.value })} placeholder="任务标题" required /><input value={focusForm.category} onChange={(e) => setFocusForm({ ...focusForm, category: e.target.value })} placeholder="分类" /><label>开始<input type="time" value={focusForm.startTime} onChange={(e) => setFocusForm({ ...focusForm, startTime: e.target.value })} required /></label><label>结束<input type="time" value={focusForm.endTime} onChange={(e) => setFocusForm({ ...focusForm, endTime: e.target.value })} required /></label><select value={focusForm.priority} onChange={(e) => setFocusForm({ ...focusForm, priority: e.target.value as NexusEvent["priority"] })}><option>High</option><option>Medium</option><option>Low</option></select><select value={focusForm.type} onChange={(e) => setFocusForm({ ...focusForm, type: e.target.value as NexusEvent["type"] })}><option value="task">Task</option><option value="schedule">Schedule</option></select><button>{editingEventId ? "Save" : "Add"}</button></form>}
+            {focusComposerOpen && <form className="focus-form" onSubmit={saveFocusEvent}>
+              <div className="focus-form-section focus-form-main"><span className="focus-form-caption">安排内容</span><input autoFocus value={focusForm.title} onChange={(e) => setFocusForm({ ...focusForm, title: e.target.value })} placeholder="任务标题" required /><input value={focusForm.category} onChange={(e) => setFocusForm({ ...focusForm, category: e.target.value })} placeholder="分类（可选）" /></div>
+              <div className="focus-form-section focus-time-grid"><span className="focus-form-caption">时间</span><label>开始<input type="time" value={focusForm.startTime} onChange={(e) => setFocusForm({ ...focusForm, startTime: e.target.value })} required /></label><label>结束<input type="time" value={focusForm.endTime} onChange={(e) => setFocusForm({ ...focusForm, endTime: e.target.value })} required /></label></div>
+              <div className="focus-form-section focus-meta-grid"><span className="focus-form-caption">属性</span><label>优先级<select value={focusForm.priority} onChange={(e) => setFocusForm({ ...focusForm, priority: e.target.value as NexusEvent["priority"] })}><option>High</option><option>Medium</option><option>Low</option></select></label><label>类型<select value={focusForm.type} onChange={(e) => setFocusForm({ ...focusForm, type: e.target.value as NexusEvent["type"] })}><option value="task">Task</option><option value="schedule">Schedule</option></select></label></div>
+              {!editingEventId && <div className="focus-form-section focus-repeat"><span className="focus-form-caption">重复</span><label className="repeat-choice">规则<select value={focusForm.repeatUnit} onChange={(e) => setFocusForm({ ...focusForm, repeatUnit: e.target.value as typeof focusForm.repeatUnit })}><option value="none">不重复</option><option value="week">每 X 周</option><option value="month">每 X 月</option></select></label>{focusForm.repeatUnit !== "none" && <div className="repeat-details"><label>每隔<input type="number" min="1" max="52" value={focusForm.repeatInterval} onChange={(e) => setFocusForm({ ...focusForm, repeatInterval: Number(e.target.value) })} /><small>{focusForm.repeatUnit === "week" ? "周" : "月"}</small></label><label>共计<input type="number" min="1" max="52" value={focusForm.repeatCount} onChange={(e) => setFocusForm({ ...focusForm, repeatCount: Number(e.target.value) })} /><small>次</small></label></div>}<p>{focusForm.repeatUnit === "none" ? "仅添加今天这一项" : `从今天开始，每 ${focusForm.repeatInterval} ${focusForm.repeatUnit === "week" ? "周" : "月"}一次，共 ${focusForm.repeatCount} 次`}</p></div>}
+              <div className="focus-form-actions"><button type="button" className="focus-cancel" onClick={() => { setFocusComposerOpen(false); setEditingEventId(null); }}>取消</button><button className="focus-submit">{editingEventId ? "保存修改" : "添加安排"}</button></div>
+            </form>}
             <div className="timeline"><p className="timeline-label">TIMELINE</p>{todayEvents.map((item) => <article className={`timeline-event ${item.status === "completed" ? "done" : ""}`} key={item.id}><time>{item.startTime}</time><div className="timeline-line"><i /></div><label><input type="checkbox" checked={item.status === "completed"} onChange={() => setEvents((items) => items.map((event) => event.id === item.id ? { ...event, status: event.status === "completed" ? "pending" : "completed" } : event))} /><span><strong>{item.type === "schedule" ? "▣" : "□"} {item.title}</strong><small>{item.startTime} - {item.endTime || `${item.duration} min`} · {item.category}</small></span></label><span className={`event-priority ${item.priority.toLowerCase()}`}>{item.priority.slice(0, 1)}</span><div className="event-actions"><button onClick={() => editFocusEvent(item)}>Edit</button><button onClick={() => setEvents((items) => items.filter((event) => event.id !== item.id))}>×</button></div></article>)}{!todayEvents.length && <p className="focus-empty">今天还没有安排。给自己留一点专注时间。</p>}</div>
             <a className="open-calendar" href="/calendar">Open Calendar <span>→</span></a>
           </section>
