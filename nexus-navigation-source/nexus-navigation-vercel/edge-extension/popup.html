@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>保存到 Nexus</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div class="brand" aria-hidden="true">N</div>
+        <div>
+          <p class="eyebrow">NEXUS SAVE</p>
+          <h1>保存当前网页</h1>
+        </div>
+      </header>
+
+      <form id="capture-form">
+        <label>
+          <span>名称</span>
+          <input id="page-title" name="title" autocomplete="off" maxlength="100" required />
+        </label>
+
+        <label>
+          <span class="field-heading">分类 <button id="recommend-category" type="button">✦ AI 推荐</button></span>
+          <select id="page-category" name="category" required>
+            <option value="__nexus_unclassified__">未归类</option>
+            <option value="__nexus_temporary__">临时网页</option>
+          </select>
+        </label>
+
+        <div class="url-card" title="当前网页地址">
+          <span class="url-dot" aria-hidden="true"></span>
+          <span id="page-url">正在读取当前网页…</span>
+        </div>
+
+        <p class="ai-hint">AI 推荐只会回填分类下拉框；最终分类以你点击“完成”时的选择为准。</p>
+
+        <p class="sync-note" id="sync-note" hidden></p>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+
+        <div class="actions">
+          <button class="secondary" id="open-nexus" type="button">打开 Nexus</button>
+          <button class="primary" id="submit-button" type="submit">完成</button>
+        </div>
+      </form>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

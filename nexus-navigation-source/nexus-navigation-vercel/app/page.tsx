@@ -6,8 +6,13 @@ type NavLink = { id: string; title: string; description: string; url: string; ca
 type ClockZone = { label: string; zone: string };
 type SearchEngine = { label: string; url: string };
 type NexusEvent = { id: string; title: string; category: string; priority: "High" | "Medium" | "Low"; type: "task" | "schedule"; date: string; startTime: string; endTime: string; duration: number; status: "pending" | "completed" | "unfinished"; source: "local" | "calendar" | "google-calendar" | "outlook-calendar" | "apple-calendar" | "microsoft-todo" | "ai-suggestion"; recurrence?: { unit: "week" | "month"; interval: number; count: number; seriesId: string } };
+type AiPermissions = { calendar: boolean; category: boolean };
+type AiPlannerConfig = { provider: string; apiKey: string; model: string; customProvider: { name: string; baseUrl: string; model: string }; permissions: AiPermissions };
+type ExtensionCapture = { id?: string; title?: string; url?: string; category?: string; requestAi?: boolean };
 
 const defaultCategories = ["复旦学习", "AI 工具", "编程开发", "知识资源"];
+const TEMP_CATEGORY = "__nexus_temporary__";
+const UNCLASSIFIED_CATEGORY = "__nexus_unclassified__";
 const palette = ["blue", "indigo", "violet", "cyan", "sky", "teal", "emerald", "amber", "orange", "rose", "purple", "pink"];
 const defaultZones: ClockZone[] = [{ label: "北京时间", zone: "Asia/Shanghai" }, { label: "旧金山时间", zone: "America/Los_Angeles" }];
 const localDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -30,6 +35,15 @@ const zoneOptions: ClockZone[] = [
   { label: "巴黎时间", zone: "Europe/Paris" }, { label: "纽约时间", zone: "America/New_York" },
   { label: "旧金山时间", zone: "America/Los_Angeles" }, { label: "悉尼时间", zone: "Australia/Sydney" },
 ];
+const providerDefaults: Record<string, { baseUrl: string; model: string }> = {
+  OpenAI: { baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
+  Qwen: { baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-plus" },
+  "智谱 AI": { baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4.5-flash" },
+  DeepSeek: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
+  Claude: { baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-5" },
+  Gemini: { baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.5-flash" },
+};
+const defaultAiPlanner: AiPlannerConfig = { provider: "OpenAI", apiKey: "", model: providerDefaults.OpenAI.model, customProvider: { name: "", baseUrl: "", model: "" }, permissions: { calendar: true, category: false } };
 const rawLinks = [
   ["复旦邮箱", "收发校园邮件", "https://mail.m.fudan.edu.cn/", "复旦学习", "邮", "blue"],
   ["复旦 eLearning", "课程资料与在线学习", "https://elearning.fudan.edu.cn/", "复旦学习", "课", "indigo"],
@@ -76,6 +90,8 @@ export default function Home() {
   const [googleQuery, setGoogleQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("全部");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [temporaryOpen, setTemporaryOpen] = useState(false);
+  const [unclassifiedOpen, setUnclassifiedOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -84,6 +100,13 @@ export default function Home() {
   const [now, setNow] = useState<Date | null>(null);
   const [ready, setReady] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", url: "", category: defaultCategories[0] });
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPlanner, setAiPlanner] = useState<AiPlannerConfig>(defaultAiPlanner);
+  const [aiSaveMessage, setAiSaveMessage] = useState("");
+  const [aiCategoryLoading, setAiCategoryLoading] = useState(false);
+  const [aiCategorySuggestion, setAiCategorySuggestion] = useState("");
+  const [aiCategoryMessage, setAiCategoryMessage] = useState("");
+  const [captureNotice, setCaptureNotice] = useState("");
 
   useEffect(() => {
     try {
@@ -99,6 +122,12 @@ export default function Home() {
         if (Array.isArray(data.zones) && data.zones.length) setZones(data.zones);
         if (data.theme === "light" || data.theme === "dark") setTheme(data.theme);
         if (data.searchEngine?.label && data.searchEngine?.url) setSearchEngine(data.searchEngine);
+        if (data.aiPlanner) setAiPlanner({
+          ...defaultAiPlanner,
+          ...data.aiPlanner,
+          customProvider: { ...defaultAiPlanner.customProvider, ...(data.aiPlanner.customProvider || {}) },
+          permissions: { calendar: data.aiPlanner.permissions?.calendar ?? true, category: data.aiPlanner.permissions?.category ?? false },
+        });
         if (Array.isArray(data.events)) setEvents(data.events.map((item: NexusEvent) => item.date < localDate() && item.status === "pending" ? { ...item, status: "unfinished" } : item));
         else if (Array.isArray(data.focusTasks)) setEvents(data.focusTasks.map((task: { id: string; title: string; category: string; minutes: number; priority: string; completed: boolean }, index: number) => ({ id: task.id, title: task.title, category: task.category, priority: task.priority === "高" ? "High" : task.priority === "低" ? "Low" : "Medium", type: "task", date: localDate(), startTime: `${String(9 + index * 2).padStart(2, "0")}:00`, endTime: "", duration: task.minutes, status: task.completed ? "completed" : "pending", source: "local" })));
       }
@@ -119,20 +148,46 @@ export default function Home() {
   }, [links, categories, username, zones, theme, searchEngine, events, ready]);
 
   useEffect(() => {
+    if (!ready) return;
+    const sendBridgeState = () => window.postMessage({ source: "nexus-web", type: "NEXUS_EXTENSION_STATE", payload: { categories, siteUrl: window.location.origin } }, window.location.origin);
+    const receiveCapture = (event: MessageEvent) => {
+      if (event.source !== window || event.origin !== window.location.origin || event.data?.source !== "nexus-edge-extension") return;
+      const capture = (event.data.payload || {}) as ExtensionCapture;
+      if (event.data.type === "NEXUS_EXTENSION_SAVE" && capture.url) {
+        const normalized = normalizeUrl(capture.url);
+        const requestedCategory = capture.category || UNCLASSIFIED_CATEGORY;
+        const category = requestedCategory === TEMP_CATEGORY || requestedCategory === UNCLASSIFIED_CATEGORY || categories.includes(requestedCategory) ? requestedCategory : UNCLASSIFIED_CATEGORY;
+        setLinks((items) => items.some((item) => normalizeUrl(item.url) === normalized) ? items : [...items, { id: crypto.randomUUID(), title: capture.title?.trim() || domainOf(normalized), description: "从 Microsoft Edge 收藏", url: normalized, category, mark: (capture.title || domainOf(normalized)).slice(0, 2).toUpperCase(), color: palette[items.length % palette.length] }]);
+        window.postMessage({ source: "nexus-web", type: "NEXUS_EXTENSION_SAVED", payload: { id: capture.id, url: normalized } }, window.location.origin);
+      }
+      if (event.data.type === "NEXUS_EXTENSION_AI_REQUEST" && capture.url) {
+        void recommendCategory({ title: capture.title || "", url: capture.url, description: "" }, true).then((category) => window.postMessage({ source: "nexus-web", type: "NEXUS_EXTENSION_AI_RESULT", payload: { id: capture.id, category, error: category ? "" : "暂时无法生成推荐" } }, window.location.origin));
+      }
+    };
+    window.addEventListener("message", receiveCapture);
+    sendBridgeState();
+    window.postMessage({ source: "nexus-web", type: "NEXUS_WEB_READY" }, window.location.origin);
+    return () => window.removeEventListener("message", receiveCapture);
+  }, [ready, categories, aiPlanner]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault(); document.getElementById("google-search")?.focus();
       }
-      if (event.key === "Escape") setSettingsOpen(false);
+      if (event.key === "Escape") { setSettingsOpen(false); setTemporaryOpen(false); setUnclassifiedOpen(false); setAiOpen(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const homepageLinks = useMemo(() => links.filter((link) => link.category !== TEMP_CATEGORY && link.category !== UNCLASSIFIED_CATEGORY), [links]);
+  const temporaryLinks = useMemo(() => links.filter((link) => link.category === TEMP_CATEGORY), [links]);
+  const unclassifiedLinks = useMemo(() => links.filter((link) => link.category === UNCLASSIFIED_CATEGORY), [links]);
   const visibleLinks = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return links.filter((link) => (activeCategory === "全部" || link.category === activeCategory) && (!needle || `${link.title} ${link.description} ${link.url}`.toLowerCase().includes(needle)));
-  }, [links, query, activeCategory]);
+    return homepageLinks.filter((link) => (activeCategory === "全部" || link.category === activeCategory) && (!needle || `${link.title} ${link.description} ${link.url}`.toLowerCase().includes(needle)));
+  }, [homepageLinks, query, activeCategory]);
   const groupedLinks = categories.map((category) => ({ category, items: visibleLinks.filter((link) => link.category === category) })).filter((group) => group.items.length);
   const todayEvents = events.filter((event) => event.date === localDate()).sort((a, b) => a.startTime.localeCompare(b.startTime));
   const focusCompleted = todayEvents.filter((event) => event.status === "completed").length;
@@ -149,15 +204,74 @@ export default function Home() {
   const zoneTime = (zone: string) => now?.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: zone }) ?? "--:--:--";
   const zoneDate = (zone: string) => now?.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long", timeZone: zone }) ?? "";
 
+  function saveAiSettings() {
+    try {
+      const data = JSON.parse(localStorage.getItem("nexus-data-v1") || "{}");
+      localStorage.setItem("nexus-data-v1", JSON.stringify({ ...data, aiPlanner }));
+      setAiSaveMessage("已保存到当前浏览器");
+      window.setTimeout(() => setAiSaveMessage(""), 2400);
+    } catch { setAiSaveMessage("保存失败，请检查浏览器设置"); }
+  }
+  function clearAiKey() {
+    const next = { ...aiPlanner, apiKey: "" };
+    setAiPlanner(next);
+    try {
+      const data = JSON.parse(localStorage.getItem("nexus-data-v1") || "{}");
+      localStorage.setItem("nexus-data-v1", JSON.stringify({ ...data, aiPlanner: next }));
+    } catch {}
+    setAiSaveMessage("API Key 已删除");
+  }
+  async function recommendCategory(candidate: Pick<typeof form, "title" | "url" | "description"> = form, silent = false): Promise<string | null> {
+    if (!silent) { setAiCategorySuggestion(""); setAiCategoryMessage(""); setAiCategoryLoading(true); }
+    if (!aiPlanner.permissions.category) { if (!silent) setAiCategoryMessage("请先在 AI Planner 中允许 Used in Category。"); if (!silent) setAiCategoryLoading(false); return null; }
+    if (!aiPlanner.apiKey) { if (!silent) setAiCategoryMessage("请先在 AI Planner 中保存 API Key。"); if (!silent) setAiCategoryLoading(false); return null; }
+    if (!categories.length) { if (!silent) setAiCategoryMessage("请先创建至少一个分类。"); if (!silent) setAiCategoryLoading(false); return null; }
+    const instruction = `你是 Nexus 的网站分类助手。只能从以下分类中推荐一个：${JSON.stringify(categories)}。网页名称：${candidate.title || "未知"}。网址：${candidate.url || "未知"}。说明：${candidate.description || "无"}。只返回 JSON：{"category":"分类原文"}。不要创建新分类，不要替用户保存。`;
+    try {
+      let response: Response; let text = "";
+      if (aiPlanner.provider === "Gemini") {
+        response = await fetch(`${providerDefaults.Gemini.baseUrl}/models/${encodeURIComponent(aiPlanner.model)}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": aiPlanner.apiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: instruction }] }], generationConfig: { responseMimeType: "application/json" } }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error?.message || "Gemini 请求失败"); text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } else if (aiPlanner.provider === "Claude") {
+        response = await fetch(`${providerDefaults.Claude.baseUrl}/messages`, { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": aiPlanner.apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: aiPlanner.model, max_tokens: 120, messages: [{ role: "user", content: instruction }] }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error?.message || "Claude 请求失败"); text = data.content?.[0]?.text || "";
+      } else {
+        const baseUrl = aiPlanner.provider === "Custom" ? aiPlanner.customProvider.baseUrl.replace(/\/$/, "") : providerDefaults[aiPlanner.provider]?.baseUrl;
+        const model = aiPlanner.provider === "Custom" ? aiPlanner.customProvider.model : aiPlanner.model;
+        if (!baseUrl?.startsWith("https://") || !model) throw new Error("请检查 Provider 的 HTTPS API 地址和模型名称");
+        response = await fetch(`${baseUrl}/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiPlanner.apiKey}` }, body: JSON.stringify({ model, messages: [{ role: "user", content: instruction }], temperature: 0 }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error?.message || "AI 请求失败"); text = data.choices?.[0]?.message?.content || "";
+      }
+      const parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, "").trim());
+      const suggestion = categories.find((category) => category === parsed.category);
+      if (!suggestion) throw new Error("AI 没有返回现有分类，请重试或手动选择");
+      if (!silent) { setAiCategorySuggestion(suggestion); setAiCategoryMessage("这只是推荐；采用前不会更改你的分类选择。"); }
+      return suggestion;
+    } catch (error) { if (!silent) setAiCategoryMessage(error instanceof Error ? error.message : "暂时无法获取分类建议"); return null; }
+    finally { if (!silent) setAiCategoryLoading(false); }
+  }
+
   function submitLink(event: FormEvent) {
     event.preventDefault();
     if (!form.title.trim() || !form.url.trim() || !form.category) return;
     const next = { ...form, title: form.title.trim(), description: form.description.trim() || "快捷访问", url: normalizeUrl(form.url.trim()) };
     if (editingId) setLinks((items) => items.map((item) => item.id === editingId ? { ...item, ...next } : item));
     else setLinks((items) => [...items, { ...next, id: crypto.randomUUID(), mark: next.title.slice(0, 2).toUpperCase(), color: palette[items.length % palette.length] }]);
-    setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] || "" });
+    setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] || "" }); setCaptureNotice(""); setAiCategorySuggestion(""); setAiCategoryMessage("");
   }
   function editLink(link: NavLink) { setEditingId(link.id); setForm({ title: link.title, description: link.description, url: link.url, category: link.category }); }
+  function organizeSavedLink(link: NavLink) {
+    setEditingId(link.id);
+    setForm({ title: link.title, description: link.description, url: link.url, category: categories[0] || "" });
+    setTemporaryOpen(false); setUnclassifiedOpen(false);
+    setCaptureNotice("请选择一个正式分类并保存，这个网页才会出现在主页。");
+    setSettingsOpen(true);
+  }
+  function clearCategoryLinks(category: string) {
+    const label = category === TEMP_CATEGORY ? "临时网页" : category;
+    if (!confirm(`清空“${label}”中的所有网页？分类本身会保留。`)) return;
+    setLinks((items) => items.filter((item) => item.category !== category));
+  }
   function removeCategory(category: string) {
     if (!confirm(`删除“${category}”及其中的所有网址？`)) return;
     setCategories((items) => {
@@ -234,7 +348,7 @@ export default function Home() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <header className="topbar">
         <a className="brand" href="#top"><span className="brand-mark">N</span><span>Nexus</span></a>
-        <div className="top-actions"><label className="mini-search"><span className="search-icon" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选导航…" aria-label="筛选导航" />{query && <button onClick={() => setQuery("")}>×</button>}</label><a className="github-link" href="https://github.com/LewisStarCo/nexus-navigation" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Nexus 项目说明" title="查看功能说明与项目源码"><img src="https://github.com/favicon.ico" alt="" /></a><button className="theme-toggle" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} aria-label="切换亮色和暗色">{theme === "dark" ? "☀" : "☾"}</button><button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button></div>
+        <div className="top-actions"><label className="mini-search"><span className="search-icon" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="筛选导航…" aria-label="筛选导航" />{query && <button onClick={() => setQuery("")}>×</button>}</label><button className="unclassified-button" onClick={() => setUnclassifiedOpen(true)} title="整理尚未决定分类的网页">未归类 <span>{unclassifiedLinks.length}</span></button><button className="temporary-button" onClick={() => setTemporaryOpen(true)} title="查看不会显示在主页的临时网页">临时网页 <span>{temporaryLinks.length}</span></button><button className="home-ai-button" onClick={() => setAiOpen(true)} title="设置 AI Provider 与使用权限"><span>✦</span> AI Planner</button><a className="github-link" href="https://github.com/LewisStarCo/nexus-navigation" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Nexus 项目说明" title="查看功能说明与项目源码"><img src="https://github.com/favicon.ico" alt="" /></a><button className="theme-toggle" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} aria-label="切换亮色和暗色">{theme === "dark" ? "☀" : "☾"}</button><button className="manage-button" onClick={() => setSettingsOpen(true)}><span>＋</span> 管理导航</button></div>
       </header>
 
       <section className="hero" id="top">
@@ -253,7 +367,7 @@ export default function Home() {
       <div className="workspace-layout">
         <section className="navigation-area" aria-live="polite">
           <div className="area-label"><span>NAVIGATION</span><p>Access your digital resources</p></div>
-          <div className="filters">{["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? links.length : links.filter((link) => link.category === category).length}</span></button>)}</div>
+          <div className="filters">{["全部", ...categories].map((category) => <button type="button" key={category} className={activeCategory === category ? "active" : ""} onClick={() => setActiveCategory(category)}>{category}<span>{category === "全部" ? homepageLinks.length : homepageLinks.filter((link) => link.category === category).length}</span></button>)}</div>
           <div className="directory">{groupedLinks.map((group) => <div className="category-section" key={group.category}><div className="section-heading"><h2>{group.category}</h2><span>{String(group.items.length).padStart(2, "0")}</span><div /></div><div className="card-grid">{group.items.map((link) => <a className="link-card" href={link.url} target="_blank" rel="noreferrer" key={link.id}><SiteIcon link={link} /><span className="card-copy"><strong>{link.title}</strong><small>{link.description}</small><span className="domain">{domainOf(link.url)}</span></span><span className="arrow">↗</span></a>)}</div></div>)}{!groupedLinks.length && <div className="empty-state"><span>⌕</span><h2>没有找到相关网站</h2><p>换个关键词试试，或添加一个新入口。</p><button onClick={() => { setQuery(""); setActiveCategory("全部"); }}>查看全部网站</button></div>}</div>
         </section>
         <aside className="workspace-area">
@@ -273,7 +387,13 @@ export default function Home() {
           </section>
         </aside>
       </div>
-      <footer><span><b>N</b> Nexus</span><p>所有个性化内容仅保存在你的浏览器中 · {links.length} 个快捷入口</p></footer>
+      <footer><span><b>N</b> Nexus</span><p>所有个性化内容仅保存在你的浏览器中 · {homepageLinks.length} 个主页入口 · {unclassifiedLinks.length} 个未归类 · {temporaryLinks.length} 个临时网页</p></footer>
+
+      {unclassifiedOpen && <div className="saved-links-layer" role="dialog" aria-modal="true" aria-label="未归类网页"><button className="modal-backdrop" onClick={() => setUnclassifiedOpen(false)} aria-label="关闭" /><section className="saved-links-panel"><header><div><small>INBOX</small><h2>未归类</h2><p>还没想好放在哪里的网页。整理后才会进入正式导航分类。</p></div><button onClick={() => setUnclassifiedOpen(false)}>×</button></header><div className="saved-links-toolbar"><span>{unclassifiedLinks.length} 个网页</span><button disabled={!unclassifiedLinks.length} onClick={() => clearCategoryLinks(UNCLASSIFIED_CATEGORY)}>删除全部</button></div><div className="saved-links-list">{unclassifiedLinks.map((link) => <article key={link.id}><SiteIcon link={link} small /><p><a href={link.url} target="_blank" rel="noreferrer">{link.title}</a><small>{domainOf(link.url)}</small></p><button onClick={() => organizeSavedLink(link)}>整理到主页</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></article>)}{!unclassifiedLinks.length && <div className="saved-links-empty"><span>✓</span><strong>没有待整理网页</strong><p>Edge 扩展中选择“未归类”的网页会出现在这里。</p></div>}</div></section></div>}
+
+      {temporaryOpen && <div className="saved-links-layer" role="dialog" aria-modal="true" aria-label="临时网页"><button className="modal-backdrop" onClick={() => setTemporaryOpen(false)} aria-label="关闭" /><section className="saved-links-panel"><header><div><small>TEMPORARY</small><h2>临时网页</h2><p>只在短期内需要的网页，不会显示在主页导航中。</p></div><button onClick={() => setTemporaryOpen(false)}>×</button></header><div className="saved-links-toolbar"><span>{temporaryLinks.length} 个网页</span><button disabled={!temporaryLinks.length} onClick={() => clearCategoryLinks(TEMP_CATEGORY)}>删除全部</button></div><div className="saved-links-list">{temporaryLinks.map((link) => <article key={link.id}><SiteIcon link={link} small /><p><a href={link.url} target="_blank" rel="noreferrer">{link.title}</a><small>{domainOf(link.url)}</small></p><button onClick={() => organizeSavedLink(link)}>添加到主页</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></article>)}{!temporaryLinks.length && <div className="saved-links-empty"><span>⌛</span><strong>没有临时网页</strong><p>Edge 扩展中选择“临时网页”后，会收纳在这里。</p></div>}</div></section></div>}
+
+      {aiOpen && <div className="calendar-modal home-ai-modal" role="dialog" aria-modal="true" aria-label="AI Planner 设置"><button className="modal-backdrop" onClick={() => setAiOpen(false)} aria-label="关闭" /><section className="ai-planner"><header><div><small>OPTIONAL · BYOK</small><h2>✦ AI Planner Settings</h2></div><button onClick={() => setAiOpen(false)}>×</button></header><p>AI 只在你允许的功能中、并由你主动操作时提供建议。它不会自动整理网页或修改日程。</p><div className="ai-permissions"><span>AI 使用权限</span><div><button type="button" className={aiPlanner.permissions.calendar ? "active" : ""} onClick={() => setAiPlanner({ ...aiPlanner, permissions: { ...aiPlanner.permissions, calendar: !aiPlanner.permissions.calendar } })}><strong>Used in Calendar</strong><small>允许生成可编辑的日程建议</small></button><button type="button" className={aiPlanner.permissions.category ? "active" : ""} onClick={() => setAiPlanner({ ...aiPlanner, permissions: { ...aiPlanner.permissions, category: !aiPlanner.permissions.category } })}><strong>Used in Category</strong><small>允许为网页推荐现有分类</small></button><button type="button" className={!aiPlanner.permissions.calendar && !aiPlanner.permissions.category ? "active danger" : "danger"} onClick={() => setAiPlanner({ ...aiPlanner, permissions: { calendar: false, category: false } })}><strong>Do not use AI in any situation</strong><small>关闭 Calendar 与 Category 中的 AI 请求</small></button></div></div><label>Provider<select value={aiPlanner.provider} onChange={(e) => { const provider = e.target.value; setAiPlanner({ ...aiPlanner, provider, model: providerDefaults[provider]?.model || aiPlanner.model }); }}><option>OpenAI</option><option>Qwen</option><option>Claude</option><option>Gemini</option><option>DeepSeek</option><option>智谱 AI</option><option value="Custom">自定义 Provider</option></select></label>{aiPlanner.provider === "Custom" && <div className="custom-provider"><label>Provider 名称<input value={aiPlanner.customProvider.name} onChange={(e) => setAiPlanner({ ...aiPlanner, customProvider: { ...aiPlanner.customProvider, name: e.target.value } })} placeholder="例如：Moonshot" /></label><label>API Base URL<input value={aiPlanner.customProvider.baseUrl} onChange={(e) => setAiPlanner({ ...aiPlanner, customProvider: { ...aiPlanner.customProvider, baseUrl: e.target.value } })} placeholder="https://api.example.com/v1" /></label></div>}<label>模型名称<input value={aiPlanner.provider === "Custom" ? aiPlanner.customProvider.model : aiPlanner.model} onChange={(e) => aiPlanner.provider === "Custom" ? setAiPlanner({ ...aiPlanner, customProvider: { ...aiPlanner.customProvider, model: e.target.value } }) : setAiPlanner({ ...aiPlanner, model: e.target.value })} placeholder="模型 ID" /></label><label>API Key<input type="password" value={aiPlanner.apiKey} onChange={(e) => setAiPlanner({ ...aiPlanner, apiKey: e.target.value })} placeholder="使用你自己的 API Key" /></label><p className="api-key-note">设置只保存在当前浏览器。Edge 扩展不会读取或保存 API Key；AI 推荐通过 Nexus 页面完成。</p><div className="ai-save-row"><button className="clear-ai-key" onClick={clearAiKey} disabled={!aiPlanner.apiKey}>删除密钥</button><span>{aiSaveMessage}</span><button className="save-ai-settings" onClick={saveAiSettings}>保存到本地</button></div></section></div>}
 
       {settingsOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-label="管理导航">
         <button className="modal-backdrop" onClick={() => setSettingsOpen(false)} aria-label="关闭" />
@@ -283,11 +403,11 @@ export default function Home() {
             <section className="setting-section"><label className="field-label">你的名字</label><input className="field" value={username} onChange={(e) => setUsername(e.target.value.slice(0, 20))} placeholder="在这里填写用户名" /><p className="field-help">将显示在首页问候语中，随时可以修改。</p></section>
             <section className="setting-section"><div className="setting-title"><h3>默认搜索引擎</h3><span>{searchEngine.label}</span></div><div className="engine-options">{searchEngines.map((engine) => <button className={searchEngine.url === engine.url ? "selected" : ""} key={engine.url} onClick={() => setSearchEngine(engine)}>{engine.label}</button>)}</div><div className="custom-engine"><input value={customEngine.label} onChange={(e) => setCustomEngine({ ...customEngine, label: e.target.value })} placeholder="自定义名称" /><input value={customEngine.url} onChange={(e) => setCustomEngine({ ...customEngine, url: e.target.value })} placeholder="https://example.com/search?q={query}" /><button onClick={() => { if (customEngine.label.trim() && customEngine.url.includes("{query}")) setSearchEngine({ label: customEngine.label.trim(), url: customEngine.url.trim() }); }}>使用自定义</button></div><p className="field-help">自定义地址必须包含 <code>{"{query}"}</code>，它会被替换成搜索内容。</p></section>
             <section className="setting-section"><div className="setting-title"><h3>时区与时钟</h3><span>{zones.length}</span></div><p className="field-help timezone-help">第一个时区是主时区，用于判断早上、中午或晚上。</p><div className="timezone-list">{zones.map((item, index) => <div key={`${item.zone}-${index}`}><p><strong>{item.label}</strong><small>{item.zone}</small></p>{index > 0 && <button onClick={() => setZones((items) => [item, ...items.filter((_, i) => i !== index)])}>设为主时区</button>}{zones.length > 1 && <button className="danger" onClick={() => setZones((items) => items.filter((_, i) => i !== index))}>删除</button>}</div>)}</div><div className="timezone-add"><select value={zoneToAdd} onChange={(e) => setZoneToAdd(e.target.value)}>{zoneOptions.filter((option, index, all) => all.findIndex((item) => item.zone === option.zone) === index).map((item) => <option value={item.zone} key={item.zone}>{item.label} · {item.zone}</option>)}</select><button onClick={() => { const item = zoneOptions.find((option) => option.zone === zoneToAdd); if (item && !zones.some((zone) => zone.zone === item.zone)) setZones((current) => [...current, item]); }}>添加时区</button></div></section>
-            <section className="setting-section"><div className="setting-title"><h3>分类 · 拖动调整顺序</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div className={draggedCategory === category ? "dragging" : ""} draggable key={category} onDragStart={() => setDraggedCategory(category)} onDragOver={(e) => e.preventDefault()} onDrop={() => moveCategory(category)} onDragEnd={() => setDraggedCategory(null)}><b className="drag-handle">⠿</b><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button onClick={() => removeCategory(category)}>删除</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
+            <section className="setting-section"><div className="setting-title"><h3>分类 · 拖动调整顺序</h3><span>{categories.length}</span></div><div className="category-list">{categories.map((category) => editingCategory === category ? <form className="category-edit" key={category} onSubmit={(event) => renameCategory(event, category)}><input autoFocus value={categoryDraft} onChange={(e) => setCategoryDraft(e.target.value)} maxLength={24} /><button className="save-category">保存</button><button type="button" onClick={() => setEditingCategory(null)}>取消</button></form> : <div className={draggedCategory === category ? "dragging" : ""} draggable key={category} onDragStart={() => setDraggedCategory(category)} onDragOver={(e) => e.preventDefault()} onDrop={() => moveCategory(category)} onDragEnd={() => setDraggedCategory(null)}><b className="drag-handle">⠿</b><span>{category}</span><button className="rename-category" onClick={() => { setEditingCategory(category); setCategoryDraft(category); }}>重命名</button><button className="clear-category" onClick={() => clearCategoryLinks(category)}>清空网页</button><button onClick={() => removeCategory(category)}>删除分类</button></div>)}</div><form className="inline-form" onSubmit={addCategory}><input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新分类名称" /><button>添加</button></form></section>
             <section className="setting-section"><div className="setting-title"><h3>{editingId ? "编辑网址" : "添加网址"}</h3><span>{links.length}</span></div>
-              {categories.length ? <form className="link-form" onSubmit={submitLink}><label>名称<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="例如：Wikipedia" required /></label><label>网址<input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" required /></label><label>说明<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="一句简短说明（可选）" /></label><label>分类<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><div className="form-actions">{editingId && <button type="button" className="ghost" onClick={() => { setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] }); }}>取消</button>}<button className="primary">{editingId ? "保存修改" : "添加到导航"}</button></div></form> : <p className="field-help">请先添加一个分类。</p>}
+              {categories.length ? <form className="link-form" onSubmit={submitLink}>{captureNotice && <div className="capture-notice">{captureNotice}</div>}<label>名称<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="例如：Wikipedia" required /></label><label>网址<input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://example.com" required /></label><label>说明<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="一句简短说明（可选）" /></label><label className="category-field">分类<div><select value={form.category} onChange={(e) => { setForm({ ...form, category: e.target.value }); setAiCategorySuggestion(""); }}>{categories.map((category) => <option key={category}>{category}</option>)}<option value={UNCLASSIFIED_CATEGORY}>未归类（稍后整理）</option><option value={TEMP_CATEGORY}>临时网页（不显示在主页）</option></select><button type="button" className="recommend-category" onClick={() => void recommendCategory()} disabled={aiCategoryLoading}>{aiCategoryLoading ? "推荐中…" : "✦ AI 推荐"}</button></div></label>{(aiCategorySuggestion || aiCategoryMessage) && <div className="category-suggestion">{aiCategorySuggestion && <><span>AI 建议分类</span><strong>{aiCategorySuggestion}</strong><button type="button" onClick={() => { setForm({ ...form, category: aiCategorySuggestion }); setAiCategorySuggestion(""); setAiCategoryMessage("已采用建议，保存前仍可修改。"); }}>采用建议</button></>}<p>{aiCategoryMessage}</p></div>}<div className="form-actions">{editingId && <button type="button" className="ghost" onClick={() => { setEditingId(null); setForm({ title: "", description: "", url: "", category: categories[0] }); setCaptureNotice(""); }}>取消</button>}<button className="primary">{form.category === TEMP_CATEGORY ? "保存为临时网页" : form.category === UNCLASSIFIED_CATEGORY ? "保存到未归类" : editingId ? "保存修改" : "添加到导航"}</button></div></form> : <p className="field-help">请先添加一个分类。</p>}
             </section>
-            <section className="setting-section"><div className="setting-title"><h3>已有网址</h3><span>{links.length}</span></div><div className="manage-links">{links.map((link) => <div key={link.id}><SiteIcon link={link} small /><p><strong>{link.title}</strong><small>{link.category}</small></p><button onClick={() => editLink(link)}>编辑</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></div>)}</div></section>
+            <section className="setting-section"><div className="setting-title"><h3>已有网址</h3><span>{links.length}</span></div><div className="manage-links">{links.map((link) => <div key={link.id}><SiteIcon link={link} small /><p><strong>{link.title}</strong><small>{link.category === TEMP_CATEGORY ? "临时网页" : link.category === UNCLASSIFIED_CATEGORY ? "未归类" : link.category}</small></p><button onClick={() => editLink(link)}>编辑</button><button className="danger" onClick={() => setLinks((items) => items.filter((item) => item.id !== link.id))}>删除</button></div>)}</div></section>
             <button className="reset-button" onClick={resetAll}>恢复默认内容</button>
           </div>
         </aside>
