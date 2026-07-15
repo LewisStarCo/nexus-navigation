@@ -9,9 +9,10 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "test": "npm run build",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "test": "npm run test:unit && npm run typecheck && npm run build",
+    "test:unit": "node --import tsx --test tests/core-data.test.mjs tests/calendar-domain.test.mjs tests/import-export.test.mjs tests/resource-navigation-ai.test.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "eslint app src tests --ignore-pattern .next"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
