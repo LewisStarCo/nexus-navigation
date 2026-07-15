@@ -414,6 +414,15 @@ nexus-navigation-vercel-v18/
 
 ## 开发者日志
 
+### v18.4 · Extension download entry
+
+- 首页增加可隐藏的“获取扩展”入口，并在本地识别 Edge、Chrome 或 Safari。
+- 三个扩展 ZIP 作为网站静态文件发布，无需先进入浏览器商店。
+- 增加独立 Markdown 安装说明，并在下载弹窗与管理面板中提供入口。
+- “隐藏首页入口”保存在统一 `NexusSettings` 中，旧数据迁移时自动补充默认值；可随时恢复。
+- 从全新安装与“恢复默认内容”中移除 XMRth，已有用户数据不会被迁移静默删除。
+- 修复代码移动到新的 Vercel Root Directory 后，缺少本地 `.openai/hosting.json` 会导致 TypeScript 构建失败的问题；该隐藏文件现在是可选配置。
+
 ### v18.3 · Chrome and Safari Web Extensions
 
 - 新增独立 Chrome Manifest V3 扩展，保留 Edge v1.2 的完整捕获与同步功能。
