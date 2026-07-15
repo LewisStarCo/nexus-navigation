@@ -113,13 +113,15 @@ type Resource =
 
 ### Microsoft Edge 快速收藏
 
-Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏中的扩展按钮后，可以直接读取当前网页标题和地址、修改名称，并选择：
+Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏中的扩展按钮后，可以读取当前网页标题、地址和公开简介。名称与介绍都可以在保存前修改，并选择：
 
 - **未归类**：默认选项，进入 Nexus 顶部“未归类”入口，方便稍后整理。
 - **临时网页**：只在短期内保留，不显示在主页导航卡片中。
 - **已有分类**：直接保存到从 Nexus 同步的正式分类。
 
 点击“完成”后，收藏先进入 Edge 本机队列。Nexus 已打开时会立即同步；没有打开时，会在下次进入 Nexus 后自动同步，不需要回到网站二次确认。
+
+扩展会依次尝试读取网页公开的 `meta description`、`og:description` 和 `twitter:description`。网页没有提供简介时，用户可以自行填写；Nexus 不再固定显示“从 Microsoft Edge 收藏”。
 
 #### 在 Edge 中安装
 
@@ -344,7 +346,7 @@ nexus-data-v1
 - 清除浏览器数据会删除 Nexus 本地数据。
 - 公共设备不建议保存 API Key。
 
-Edge 扩展仅申请 `activeTab` 与 `storage`，站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。它只在用户点击扩展时读取当前标签页的标题和地址，不读取浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
+Edge 扩展申请 `activeTab`、`scripting` 与 `storage`，站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。`scripting` 只在用户点击扩展时读取当前网页公开的描述元数据，不读取表单、密码或浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
 
 ## 本地运行
 
@@ -394,6 +396,15 @@ nexus-navigation-vercel-v18/
 ```
 
 ## 开发者日志
+
+### v18.2 · Rich Edge capture metadata
+
+- Nexus Save v1.2 新增可编辑 Website 介绍字段。
+- 扩展优先读取页面公开的 description / Open Graph / Twitter 元数据，并限制为 240 字符。
+- Edge 同步协议新增可选 `description`，保持 v1.1 待同步队列兼容。
+- 用户重新收藏同一网址时更新名称、介绍与分类，并保留 Resource ID、顺序和 Event 关联。
+- AI 分类推荐可使用用户确认后的介绍作为上下文，但仍只回填建议分类。
+- 自动回归测试增加到 47 项。
 
 ### v18.1 · Conflict warning and advisory rescheduling
 
