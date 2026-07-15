@@ -6,12 +6,13 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "test": "npm run test:unit && npm run typecheck && npm run build",
+    "test:unit": "node --import tsx --test tests/core-data.test.mjs tests/calendar-domain.test.mjs tests/import-export.test.mjs tests/resource-navigation-ai.test.mjs tests/browser-extensions.test.mjs",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "eslint app src tests --ignore-pattern .next"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
