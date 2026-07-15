@@ -39,6 +39,16 @@ This checklist protects the Nexus v17 user experience while the internals move t
 - [ ] Move an Unclassified or Temporary Resource into a regular Category.
 - [ ] Clear all Resources in a Category, Unclassified and Temporary.
 - [ ] Install/use the existing Edge extension and verify queued captures, Category names and save acknowledgements remain compatible.
+- [ ] Open Nexus Save v1.2 on a page with `meta description` and verify the introduction is prefilled and editable.
+- [ ] Save a page without description metadata and verify Nexus uses a neutral fallback instead of “从 Microsoft Edge 收藏”.
+- [ ] Deliver a v1.1 queued capture without `description` and verify it remains compatible.
+- [ ] Re-save an existing Website URL and verify name/description/category update without changing Resource ID, order or Event links.
+- [ ] Open an already-saved URL and verify every browser extension shows “网页已收藏” before submission.
+- [ ] Queue the same URL twice while Nexus is closed and verify the second save updates one queued item instead of creating two.
+- [ ] Load `chrome-extension` in Chrome and verify capture, categories, queue delivery and AI recommendation match Edge.
+- [ ] Temporarily load `safari-extension` in macOS Safari and verify manual capture works with approved Nexus site access.
+- [ ] In Safari, deny or fail metadata scripting and verify the introduction remains manually editable instead of blocking save.
+- [ ] Confirm all three extension manifests request only activeTab, scripting, storage and the Nexus host permission.
 - [ ] Confirm AI Category recommendations never apply until the user chooses to adopt one.
 
 ## Calendar and Focus

@@ -114,13 +114,15 @@ type Resource =
 
 ### Microsoft Edge 快速收藏
 
-Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏中的扩展按钮后，可以直接读取当前网页标题和地址、修改名称，并选择：
+Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏中的扩展按钮后，可以读取当前网页标题、地址和公开简介。名称与介绍都可以在保存前修改，并选择：
 
 - **未归类**：默认选项，进入 Nexus 顶部“未归类”入口，方便稍后整理。
 - **临时网页**：只在短期内保留，不显示在主页导航卡片中。
 - **已有分类**：直接保存到从 Nexus 同步的正式分类。
 
 点击“完成”后，收藏先进入 Edge 本机队列。Nexus 已打开时会立即同步；没有打开时，会在下次进入 Nexus 后自动同步，不需要回到网站二次确认。
+
+扩展会依次尝试读取网页公开的 `meta description`、`og:description` 和 `twitter:description`。网页没有提供简介时，用户可以自行填写；Nexus 不再固定显示“从 Microsoft Edge 收藏”。
 
 #### 在 Edge 中安装
 
@@ -131,9 +133,28 @@ Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏
 5. 选择解压后的 **`edge-extension` 文件夹**；该文件夹内应直接看到 `manifest.json`。
 6. 打开 Edge 的扩展菜单，将 **Nexus Save** 固定到工具栏。
 
-当前版本先支持桌面版 Microsoft Edge。Chrome 与 Safari 适配尚未发布。
-
 Microsoft 官方参考：[在 Edge 中旁加载扩展](https://learn.microsoft.com/microsoft-edge/extensions/getting-started/extension-sideloading)。
+
+#### 在 Google Chrome 中安装
+
+1. 解压 `nexus-save-chrome-v1.zip`。
+2. 打开 `chrome://extensions/` 并启用“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择 `chrome-extension` 文件夹，并固定 **Nexus Save for Chrome**。
+
+Chrome 版保留 Edge 版的全部功能，包括可编辑介绍、正式分类/未归类/临时资源、本机待同步队列和用户主动触发的 AI 分类推荐。
+
+Google 官方参考：[加载未封装的扩展程序](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked)。
+
+#### 在 Safari 中安装或测试
+
+macOS Safari 14+ 可以从 Safari → 设置 → 开发者使用“Add Temporary Extension…”临时加载 `safari-extension` 文件夹或 `nexus-save-safari-v1.zip`。临时扩展会在退出 Safari 或约 24 小时后移除。
+
+长期安装、iPhone/iPad 测试或 App Store 发布必须通过 Apple 的打包与签名流程，可以使用 Xcode，也可以使用 App Store Connect 的 Safari Web Extension Packager。完整步骤见 [`safari-extension/README.md`](safari-extension/README.md)。
+
+Apple 官方参考：[Safari Web Extensions](https://developer.apple.com/documentation/safariservices/safari-web-extensions)、[运行 Safari Web Extension](https://developer.apple.com/documentation/safariservices/running-your-safari-web-extension)。
+
+扩展的 GitHub Releases、官方商店和网站安装引导方案见 [`docs/EXTENSION_DISTRIBUTION.md`](docs/EXTENSION_DISTRIBUTION.md)。浏览器不允许网页静默安装扩展，所有安装都必须由用户确认。
 
 #### AI 分类推荐
 
@@ -351,7 +372,7 @@ nexus-data-v1
 - 清除浏览器数据会删除 Nexus 本地数据。
 - 公共设备不建议保存 API Key。
 
-Edge 扩展仅申请 `activeTab` 与 `storage`，站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。它只在用户点击扩展时读取当前标签页的标题和地址，不读取浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
+Edge、Chrome 与 Safari 扩展均申请最小化的 `activeTab`、`scripting` 与 `storage` 权限，Nexus 站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。`scripting` 只在用户点击扩展时读取当前网页公开的描述元数据，不读取表单、密码或浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
 
 ## 本地运行
 
@@ -411,12 +432,32 @@ src/
 
 public/                # 静态资源
 edge-extension/        # Microsoft Edge 的 Nexus Save 扩展
+chrome-extension/      # Google Chrome 的 Nexus Save 扩展
+safari-extension/      # Safari Web Extension 源码与 Xcode 转换说明
 tests/                 # 数据迁移、领域规则和平台回归测试
 package.json           # 项目依赖与运行脚本
 next.config.ts         # Next.js 配置
 ```
 
 ## 开发者日志
+
+### v18.3 · Chrome and Safari Web Extensions
+
+- 新增独立 Chrome Manifest V3 扩展，完整保留 Edge v1.2 的捕获、分类、介绍、队列与 AI 推荐能力。
+- 新增 Safari Web Extension 源码，可在 macOS Safari 临时加载，并可由 Xcode 转换为 macOS/iOS 容器 App。
+- 三个浏览器版本沿用同一 Nexus Web Bridge 协议，不新增服务器、账户或云同步依赖。
+- Safari 不支持的可选元数据调用会安全降级为手动填写介绍，不影响基础收藏。
+- Nexus 会向扩展同步已收藏 URL；重复网页在保存前显示提醒，并以显式“更新收藏”替代重复创建。
+- 新增三套 Manifest、权限、弹窗字段与消息桥接自动检查；自动回归测试增加到 54 项。
+
+### v18.2 · Rich Edge capture metadata
+
+- Nexus Save v1.2 新增可编辑 Website 介绍字段。
+- 扩展优先读取页面公开的 description / Open Graph / Twitter 元数据，并限制为 240 字符。
+- Edge 同步协议新增可选 `description`，保持 v1.1 待同步队列兼容。
+- 用户重新收藏同一网址时更新名称、介绍与分类，并保留 Resource ID、顺序和 Event 关联。
+- AI 分类推荐可使用用户确认后的介绍作为上下文，但仍只回填建议分类。
+- 自动回归测试增加到 47 项。
 
 ### v18.1 · Conflict warning and advisory rescheduling
 
@@ -565,8 +606,8 @@ next.config.ts         # Next.js 配置
 - 可选的 Vercel AI 请求中转层。
 - Calendar 冲突检测与更细粒度拖动。
 - 用户主动选择的数据导入与导出。
-- Microsoft Edge 扩展稳定后适配 Google Chrome。
-- 将现有扩展转换为 Safari Web Extension。
+- 将 Chrome 扩展发布到 Chrome Web Store。
+- 使用 Xcode 完成 Safari 容器 App 签名，并评估 App Store 发布。
 - 探索原生 macOS App；未来可使用 `appIdentifier` 与系统能力安全连接 Application，同时保持网页端数据模型兼容。
 
 Roadmap 仅代表可能的发展方向，不表示已经完成。

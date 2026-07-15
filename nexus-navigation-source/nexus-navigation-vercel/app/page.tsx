@@ -40,6 +40,7 @@ import {
 } from "@/src/modules/navigation/domain/selectors";
 import {
   createResource,
+  displayResourceDescription,
   nextResourceOrder,
   removeResourcesAndDetachEvents,
   updateResource,
@@ -73,6 +74,7 @@ import {
   categoriesForEdgeExtension,
   categoryIdFromEdgeExtension,
   categoryNameForEdgeExtension,
+  descriptionForEdgeExtension,
   EDGE_EXTENSION_MESSAGE,
   isEdgeExtensionBridgeMessage,
   NEXUS_WEB_MESSAGE_SOURCE,
@@ -125,7 +127,7 @@ function SiteIcon({ link, small = false }: { link: Resource; small?: boolean }) 
 }
 
 function ResourceCard({ resource, onApplication }: { resource: Resource; onApplication: (resource: Resource) => void }) {
-  const content = <><SiteIcon link={resource} /><span className="card-copy"><strong>{resource.name}</strong><small>{resource.description}</small><span className="domain">{resource.type === "website" ? `🌐 Website · ${domainOf(resource.url)}` : `💻 Application${resource.appIdentifier ? ` · ${resource.appIdentifier}` : ""}`}</span></span><span className="arrow">{resource.type === "website" ? "↗" : "i"}</span></>;
+  const content = <><SiteIcon link={resource} /><span className="card-copy"><strong>{resource.name}</strong><small>{displayResourceDescription(resource)}</small><span className="domain">{resource.type === "website" ? `🌐 Website · ${domainOf(resource.url)}` : `💻 Application${resource.appIdentifier ? ` · ${resource.appIdentifier}` : ""}`}</span></span><span className="arrow">{resource.type === "website" ? "↗" : "i"}</span></>;
   return resource.type === "website"
     ? <button type="button" className="link-card" onClick={() => void platformAdapter.openExternalUrl(resource.url)} key={resource.id}>{content}</button>
     : <button type="button" className="link-card" onClick={() => onApplication(resource)} key={resource.id}>{content}</button>;
@@ -214,7 +216,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!ready) return;
-    const sendBridgeState = () => window.postMessage({ source: NEXUS_WEB_MESSAGE_SOURCE, type: EDGE_EXTENSION_MESSAGE.state, payload: { categories: categoriesForEdgeExtension(categories), siteUrl: window.location.origin } }, window.location.origin);
+    const sendBridgeState = () => window.postMessage({ source: NEXUS_WEB_MESSAGE_SOURCE, type: EDGE_EXTENSION_MESSAGE.state, payload: { categories: categoriesForEdgeExtension(categories), savedUrls: links.filter((resource) => resource.type === "website").map((resource) => resource.url), siteUrl: window.location.origin } }, window.location.origin);
     const receiveCapture = (event: MessageEvent) => {
       if (event.source !== window || event.origin !== window.location.origin || !isEdgeExtensionBridgeMessage(event.data)) return;
       const capture = (event.data.payload || {}) as EdgeExtensionCapture;
@@ -224,14 +226,25 @@ export default function Home() {
           const candidate = createResource({
             type: "website",
             name: capture.title?.trim() || domainOf(capture.url || ""),
-            description: "从 Microsoft Edge 收藏",
+            description: descriptionForEdgeExtension(capture),
             url: capture.url || "",
             categoryId,
             color: palette[current.resources.length % palette.length],
           }, { order: nextResourceOrder(current.resources) });
           if (candidate.type !== "website") return current;
-          const duplicate = current.resources.some((item) => item.type === "website" && item.url === candidate.url);
-          return duplicate ? current : { ...current, resources: [...current.resources, candidate] };
+          const duplicateIndex = current.resources.findIndex((item) => item.type === "website" && item.url === candidate.url);
+          if (duplicateIndex < 0) return { ...current, resources: [...current.resources, candidate] };
+          const existing = current.resources[duplicateIndex];
+          const resources = current.resources.map((item, index) => index === duplicateIndex ? {
+            ...item,
+            name: candidate.name,
+            description: candidate.description,
+            categoryId: candidate.categoryId,
+            updatedAt: new Date().toISOString(),
+          } : item);
+          return existing.name === candidate.name && existing.description === candidate.description && existing.categoryId === candidate.categoryId
+            ? current
+            : { ...current, resources };
         }).then((saved) => {
           const stored = saved.resources.find((resource) => resource.type === "website" && resource.name === (capture.title?.trim() || domainOf(capture.url || "")));
           const normalized = stored?.type === "website" ? stored.url : capture.url;
@@ -239,7 +252,7 @@ export default function Home() {
         }).catch(() => setCaptureNotice("Edge 收藏暂时无法保存，请先检查浏览器本地数据。"));
       }
       if (event.data.type === EDGE_EXTENSION_MESSAGE.aiRequest && capture.url) {
-        void recommendCategory({ name: capture.title || "", url: capture.url, description: "" }, true).then((categoryId) => {
+        void recommendCategory({ name: capture.title || "", url: capture.url, description: capture.description || "" }, true).then((categoryId) => {
           const category = categoryId ? categoryNameForEdgeExtension(categoryId, categories) : "";
           window.postMessage({ source: NEXUS_WEB_MESSAGE_SOURCE, type: EDGE_EXTENSION_MESSAGE.aiResult, payload: { id: capture.id, category, error: category ? "" : "暂时无法生成推荐" } }, window.location.origin);
         });
@@ -249,7 +262,7 @@ export default function Home() {
     sendBridgeState();
     window.postMessage({ source: NEXUS_WEB_MESSAGE_SOURCE, type: EDGE_EXTENSION_MESSAGE.webReady }, window.location.origin);
     return () => window.removeEventListener("message", receiveCapture);
-  }, [ready, categories, aiPlanner, updateAndSave, recommendCategory]);
+  }, [ready, categories, links, aiPlanner, updateAndSave, recommendCategory]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -319,10 +332,10 @@ export default function Home() {
     });
     setEditingId(null); setForm({ name: "", type: "website", description: "", url: "", appIdentifier: "", icon: "", categoryId: categories[0]?.id || UNCLASSIFIED_CATEGORY }); setCaptureNotice(""); setAiCategorySuggestion(""); setAiCategoryMessage("");
   }
-  function editLink(link: Resource) { setEditingId(link.id); setForm({ name: link.name, type: link.type, description: link.description ?? "", url: link.type === "website" ? link.url : "", appIdentifier: link.type === "application" ? link.appIdentifier ?? "" : "", icon: link.icon ?? "", categoryId: link.categoryId ?? UNCLASSIFIED_CATEGORY }); }
+  function editLink(link: Resource) { setEditingId(link.id); setForm({ name: link.name, type: link.type, description: displayResourceDescription(link), url: link.type === "website" ? link.url : "", appIdentifier: link.type === "application" ? link.appIdentifier ?? "" : "", icon: link.icon ?? "", categoryId: link.categoryId ?? UNCLASSIFIED_CATEGORY }); }
   function organizeSavedLink(link: Resource) {
     setEditingId(link.id);
-    setForm({ name: link.name, type: link.type, description: link.description ?? "", url: link.type === "website" ? link.url : "", appIdentifier: link.type === "application" ? link.appIdentifier ?? "" : "", icon: link.icon ?? "", categoryId: categories[0]?.id || UNCLASSIFIED_CATEGORY });
+    setForm({ name: link.name, type: link.type, description: displayResourceDescription(link), url: link.type === "website" ? link.url : "", appIdentifier: link.type === "application" ? link.appIdentifier ?? "" : "", icon: link.icon ?? "", categoryId: categories[0]?.id || UNCLASSIFIED_CATEGORY });
     setTemporaryOpen(false); setUnclassifiedOpen(false);
     setCaptureNotice("请选择一个正式分类并保存，这个 Resource 才会出现在主页。");
     setSettingsOpen(true);

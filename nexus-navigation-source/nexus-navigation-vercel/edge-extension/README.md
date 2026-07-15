@@ -16,8 +16,9 @@
 
 1. 打开想要保存为 Website Resource 的普通网页。
 2. 点击工具栏中的 Nexus Save。
-3. 修改 Website 名称并选择 Resource 分类。
-4. 点击“完成”。无需跳转；扩展会自动同步。
+3. 检查 Website 名称与介绍。扩展会优先读取网页公开的 `description`、Open Graph 或 Twitter 简介，你也可以手动修改。
+4. 选择 Resource 分类。
+5. 点击“完成”。无需跳转；扩展会自动同步。
 
 分类下拉框的前两项是特殊入口：
 
@@ -35,6 +36,7 @@ AI 在这里是 Advisor，而不是 Decision Maker。扩展不会使用 `Used in
 ## 隐私与权限
 
 - `activeTab`：仅在你点击扩展时读取当前标签页的标题和地址。
+- `scripting`：仅在你点击扩展时，从当前网页读取公开的描述元数据；不会读取表单、密码或浏览历史。
 - `storage`：在本机保存 Resource 分类缓存和等待 Nexus 同步的 Website 队列。
 - `https://nexus-navigation.vercel.app/*`：只用于和 Nexus 网页交换 Resource 分类、Website 与 AI 推荐请求。
 
@@ -53,7 +55,7 @@ AI 在这里是 Advisor，而不是 Decision Maker。扩展不会使用 `Used in
 
 扩展向网页广播：
 
-- `NEXUS_EXTENSION_SAVE`：逐条发送 `queuedCaptures` 中 Website 的 `id`、`title`、`url`、`category` 与 `createdAt`。
+- `NEXUS_EXTENSION_SAVE`：逐条发送 `queuedCaptures` 中 Website 的 `id`、`title`、可选 `description`、`url`、`category` 与 `createdAt`。
 - `NEXUS_EXTENSION_AI_REQUEST`：请求 Nexus 使用已经保存的 AI 配置为 Website Resource 生成分类建议。
 
 特殊分类值：
@@ -62,3 +64,17 @@ AI 在这里是 Advisor，而不是 Decision Maker。扩展不会使用 `Used in
 - `__nexus_temporary__` → 临时网页
 
 所有网页消息都带有明确的 `source`，并仅在 Nexus 自身 origin 内传递。
+
+## v1.2 更新
+
+- 收藏弹窗新增可编辑的“介绍”字段。
+- 自动读取网页公开的 `meta description`、`og:description` 或 `twitter:description`。
+- 网页没有公开简介时可以留空或手动填写；Nexus 会使用中性的备用说明。
+- 协议中的 `description` 为可选字段，因此 v1.1 留下的待同步队列仍然兼容。
+- 再次收藏已经存在的同一网址时，会更新名称、介绍和分类，不会创建重复 Resource；原有 ID、顺序和 Event 关联保持不变。
+
+## v1.3 更新
+
+- Nexus 会把已经保存的 Website URL 同步到扩展本机缓存。
+- 打开已收藏网页时，弹窗显示“网页已收藏”，主按钮变为“更新收藏”。
+- 同一网址已经在待同步队列中时也会提醒，并更新队列中的项目而不是重复排队。
