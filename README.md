@@ -132,9 +132,24 @@ Nexus 提供桌面版 Microsoft Edge 扩展 `Nexus Save`。点击 Edge 工具栏
 5. 选择解压后的 **`edge-extension` 文件夹**；该文件夹内应直接看到 `manifest.json`。
 6. 打开 Edge 的扩展菜单，将 **Nexus Save** 固定到工具栏。
 
-当前版本先支持桌面版 Microsoft Edge。Chrome 与 Safari 适配尚未发布。
-
 Microsoft 官方参考：[在 Edge 中旁加载扩展](https://learn.microsoft.com/microsoft-edge/extensions/getting-started/extension-sideloading)。
+
+#### 在 Google Chrome 中安装
+
+1. 解压 `nexus-save-chrome-v1.zip`。
+2. 打开 `chrome://extensions/` 并启用“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择 `chrome-extension` 文件夹，并固定 **Nexus Save for Chrome**。
+
+Chrome 版保留 Edge 版的全部功能，包括可编辑介绍、正式分类/未归类/临时资源、本机待同步队列和用户主动触发的 AI 分类推荐。
+
+#### 在 Safari 中安装或测试
+
+macOS Safari 14+ 可以从 Safari → 设置 → 开发者使用“Add Temporary Extension…”临时加载 `safari-extension` 文件夹或 `nexus-save-safari-v1.zip`。临时扩展会在退出 Safari 或约 24 小时后移除。
+
+长期安装、iPhone/iPad 测试或 App Store 发布必须通过 Apple 的打包与签名流程，可以使用 Xcode，也可以使用 App Store Connect 的 Safari Web Extension Packager。完整步骤见 `safari-extension/README.md`。
+
+扩展的 GitHub Releases、官方商店和网站安装引导方案见 `docs/EXTENSION_DISTRIBUTION.md`。浏览器不允许网页静默安装扩展，所有安装都必须由用户确认。
 
 #### AI 分类推荐
 
@@ -346,7 +361,7 @@ nexus-data-v1
 - 清除浏览器数据会删除 Nexus 本地数据。
 - 公共设备不建议保存 API Key。
 
-Edge 扩展申请 `activeTab`、`scripting` 与 `storage`，站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。`scripting` 只在用户点击扩展时读取当前网页公开的描述元数据，不读取表单、密码或浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
+Edge、Chrome 与 Safari 扩展均申请最小化的 `activeTab`、`scripting` 与 `storage` 权限，Nexus 站点访问范围仅限 `https://nexus-navigation.vercel.app/*`。`scripting` 只在用户点击扩展时读取当前网页公开的描述元数据，不读取表单、密码或浏览历史，也不读取 Nexus 中保存的 API Key。只有用户主动请求 AI 分类推荐时，网页信息和分类名才会由 Nexus 发送给用户选择的 Provider。
 
 ## 本地运行
 
@@ -391,11 +406,22 @@ nexus-navigation-vercel-v18/
 ├── docs/                 # v18 手动回归清单
 ├── public/
 ├── edge-extension/       # Microsoft Edge 的 Nexus Save 扩展
+├── chrome-extension/     # Google Chrome 的 Nexus Save 扩展
+├── safari-extension/     # Safari Web Extension 源码
 ├── package.json
 └── next.config.ts
 ```
 
 ## 开发者日志
+
+### v18.3 · Chrome and Safari Web Extensions
+
+- 新增独立 Chrome Manifest V3 扩展，保留 Edge v1.2 的完整捕获与同步功能。
+- 新增 Safari Web Extension 源码、临时安装说明和 Xcode 转换步骤。
+- 三个浏览器版本共用现有 Nexus Bridge，AI 仍只提供需用户确认的分类建议。
+- Safari 可选元数据读取失败时安全降级为手动填写。
+- 三个扩展都会在已收藏网页上显示提醒，并把重复保存转换为显式更新。
+- 自动回归测试增加到 54 项。
 
 ### v18.2 · Rich Edge capture metadata
 
@@ -562,8 +588,8 @@ nexus-navigation-vercel-v18/
 - 可选的 Vercel AI 请求中转层。
 - Calendar 冲突检测与更细粒度拖动。
 - 用户主动选择的数据导入与导出。
-- Microsoft Edge 扩展稳定后适配 Google Chrome。
-- 将现有扩展转换为 Safari Web Extension。
+- 将 Chrome 扩展发布到 Chrome Web Store。
+- 使用 Xcode 完成 Safari 容器 App 签名，并评估 App Store 发布。
 - 探索原生 macOS App；未来可使用 `appIdentifier` 与系统能力安全连接 Application，同时保持网页端数据模型兼容。
 
 Roadmap 仅代表可能的发展方向，不表示已经完成。
