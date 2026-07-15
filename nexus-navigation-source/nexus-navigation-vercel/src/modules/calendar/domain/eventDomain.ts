@@ -25,6 +25,59 @@ export interface EventValidationResult {
   errors: string[];
 }
 
+export interface EventConflict {
+  proposedId: string;
+  existingId: string;
+  date: string;
+  overlapStart: string;
+  overlapEnd: string;
+}
+
+function overlapBetween(left: NexusEvent, right: NexusEvent): EventConflict | null {
+  if (left.date !== right.date) return null;
+  const overlapStart = left.startTime > right.startTime ? left.startTime : right.startTime;
+  const overlapEnd = left.endTime < right.endTime ? left.endTime : right.endTime;
+  if (overlapStart >= overlapEnd) return null;
+  return {
+    proposedId: left.id,
+    existingId: right.id,
+    date: left.date,
+    overlapStart,
+    overlapEnd,
+  };
+}
+
+/**
+ * Finds time overlaps without deciding whether they are allowed. Touching
+ * boundaries (for example 10:00–11:00 and 11:00–12:00) are not conflicts.
+ * The caller remains responsible for showing a warning and asking the user.
+ */
+export function findEventConflicts(
+  proposedEvents: readonly NexusEvent[],
+  existingEvents: readonly NexusEvent[],
+  options: { ignoreEventIds?: Iterable<string> } = {},
+): EventConflict[] {
+  const ignored = new Set(options.ignoreEventIds ?? []);
+  const conflicts: EventConflict[] = [];
+
+  for (const proposed of proposedEvents) {
+    for (const existing of existingEvents) {
+      if (ignored.has(existing.id) || proposed.id === existing.id) continue;
+      const conflict = overlapBetween(proposed, existing);
+      if (conflict) conflicts.push(conflict);
+    }
+  }
+
+  for (let leftIndex = 0; leftIndex < proposedEvents.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < proposedEvents.length; rightIndex += 1) {
+      const conflict = overlapBetween(proposedEvents[leftIndex], proposedEvents[rightIndex]);
+      if (conflict) conflicts.push(conflict);
+    }
+  }
+
+  return conflicts;
+}
+
 export function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

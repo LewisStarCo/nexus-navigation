@@ -4,6 +4,7 @@ export {
   calculateDuration,
   createEvent,
   dateKey,
+  findEventConflicts,
   generateRecurringEvents,
   markPastPendingEventsUnfinished,
   minutesToTime,
@@ -16,6 +17,7 @@ export {
 
 export type {
   EventDomainContext,
+  EventConflict,
   EventValidationResult,
   RecurringEventDraft,
   RepeatUnit,

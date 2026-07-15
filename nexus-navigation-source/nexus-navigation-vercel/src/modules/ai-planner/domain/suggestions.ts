@@ -1,4 +1,4 @@
-import type { Category, EventDraft, Resource } from "@/src/shared/types";
+import type { Category, EventDraft, NexusEvent, Resource } from "@/src/shared/types";
 
 export interface CategorySuggestion {
   categoryId: string;
@@ -17,6 +17,18 @@ export interface CalendarDraftSuggestion {
     repeatInterval: number;
     repeatCount: number;
   };
+}
+
+export interface CalendarEventAdjustment {
+  eventId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
+export interface CalendarPlanningSuggestion extends CalendarDraftSuggestion {
+  adjustments: CalendarEventAdjustment[];
 }
 
 export function parseAIJson(raw: string): unknown {
@@ -115,6 +127,54 @@ export function validateCalendarDraftSuggestion(
       repeatCount: Math.max(1, Math.min(52, Number(event.repeatCount) || 1)),
     },
   };
+}
+
+/**
+ * Validates a staged planning proposal. Adjustments may only point at Events
+ * that already exist, and may only change date/time. This deliberately keeps
+ * AI output advisory: persistence is still a separate user-confirmed action.
+ */
+export function validateCalendarPlanningSuggestion(
+  value: unknown,
+  existingEvents: readonly NexusEvent[],
+  resources: readonly Resource[],
+  fallback: EventDraft,
+  allowResourcePlanning: boolean,
+): CalendarPlanningSuggestion | null {
+  const draft = validateCalendarDraftSuggestion(
+    value,
+    resources,
+    fallback,
+    allowResourcePlanning,
+  );
+  if (!draft) return null;
+
+  const input = value as Record<string, unknown>;
+  const knownIds = new Set(existingEvents.map((event) => event.id));
+  const seen = new Set<string>();
+  const rawAdjustments = Array.isArray(input.adjustments) ? input.adjustments : [];
+  const adjustments: CalendarEventAdjustment[] = [];
+
+  for (const raw of rawAdjustments) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    const eventId = typeof item.eventId === "string" ? item.eventId : "";
+    if (!knownIds.has(eventId) || seen.has(eventId)) continue;
+    if (!isDate(item.date) || !isTime(item.startTime) || !isTime(item.endTime)) continue;
+    if (item.startTime >= item.endTime) continue;
+    seen.add(eventId);
+    adjustments.push({
+      eventId,
+      date: item.date,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      reason: typeof item.reason === "string" && item.reason.trim()
+        ? item.reason.trim()
+        : "为新的安排腾出时间",
+    });
+  }
+
+  return { ...draft, adjustments };
 }
 
 /**

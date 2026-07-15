@@ -58,6 +58,9 @@ This checklist protects the Nexus v17 user experience while the internals move t
 - [ ] Confirm Today's Focus displays associated Resources.
 - [ ] Confirm Today's Progress and Weekly Progress match completed Events.
 - [ ] Confirm an overdue pending Event becomes unfinished without schema migration changing historical data.
+- [ ] Add an overlapping Event from Today’s Focus and verify the warning allows both returning and saving anyway.
+- [ ] Add or edit an overlapping Event in Calendar and verify the warning is advisory, not blocking.
+- [ ] Confirm back-to-back Events whose boundaries only touch do not trigger a conflict warning.
 
 ## Calendar import
 
@@ -78,6 +81,11 @@ This checklist protects the Nexus v17 user experience while the internals move t
 - [ ] Verify Used in Calendar, Used in Category and Used in Planning independently gate requests.
 - [ ] Enable Do not use AI in any situation and verify no AI request is sent.
 - [ ] Verify Calendar drafts require Adjust/Accept/Add to Calendar confirmation.
+- [ ] Ask AI to make room for a sudden Event and verify existing Event adjustments appear as an editable preview.
+- [ ] Verify an AI adjustment can only reference a real Event and can change only date/start/end time.
+- [ ] Verify Ignore and closing the AI panel leave every existing Event unchanged.
+- [ ] Verify “确认并应用” is required before the new Event or any suggested adjustment is saved.
+- [ ] Verify a remaining overlap in an AI plan still triggers the non-blocking conflict warning.
 - [ ] Verify Category suggestions require explicit adoption.
 - [ ] Verify Suggested Resources contain only existing Resource IDs and require Accept/Modify.
 - [ ] Verify Ignore never changes Events, Resources, Navigation or Calendar.

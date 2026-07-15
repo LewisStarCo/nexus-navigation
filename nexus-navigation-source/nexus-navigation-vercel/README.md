@@ -36,6 +36,15 @@ interface NexusData {
 
 开发和回归说明见 [`docs/V18_REGRESSION_CHECKLIST.md`](docs/V18_REGRESSION_CHECKLIST.md)。
 
+### v18.1 · Schedule conflict advisory
+
+- 首页 Today’s Focus 与 Calendar 在新增或修改 Event 时会检测时间重叠，并显示非阻断式提醒。
+- 提醒只提供“返回调整”和“仍然保存”；Nexus 不禁止用户同时安排两件事情。
+- Calendar AI 可以针对突发安排建议移动已有 Event，并展示原时间、建议时间与原因。
+- AI 只能引用真实存在的 Event ID，且建议中只允许调整日期、开始时间和结束时间。
+- 新日程与所有调整都可在预览中修改；只有用户点击“确认并应用”后才会保存。
+- AI 不会自动删除、完成、改名或移动 Event，继续遵守 **AI Advisor, Not Decision Maker**。
+
 ## 设计理念
 
 Nexus 不试图成为展示所有信息的传统 Dashboard。它不会加入天气、新闻、股票、热点或其他与行动无关的信息。
@@ -409,6 +418,14 @@ next.config.ts         # Next.js 配置
 
 ## 开发者日志
 
+### v18.1 · Conflict warning and advisory rescheduling
+
+- 新增集中式 Event overlap 检测；相邻但不重叠的日程不会误报。
+- 首页与 Calendar 共用非阻断冲突规则，用户仍可明确选择保留重叠安排。
+- AI Calendar 建议支持受限的已有 Event 改期草案；Event ID、日期和时间均在客户端校验。
+- AI 方案在确认前只存在于预览状态，不写入 Storage，也不能修改标题、状态、Resource 或 Navigation。
+- 自动回归测试增加到 46 项，并加入冲突边界和 AI 伪造 Event ID 防护测试。
+
 ### v18 · Core architecture refactor
 
 - 建立唯一 `NexusData`、共享 Resource/Event/Settings/AI 类型与稳定 Category ID。
@@ -419,7 +436,7 @@ next.config.ts         # Next.js 配置
 - 将 Settings、Resources、Navigation、Calendar、Focus、AI Planner、Import/Export 的核心规则抽成可测试模块。
 - 建立 Browser Platform Adapter、Desktop 占位接口及 Edge v1.x 协议映射层；未引入 Tauri 或 SQLite。
 - AI 请求、权限判断和建议校验统一进入 AI Planner 模块，继续遵守 Advisor, Not Decision Maker。
-- 新增 43 项领域、迁移与数据安全自动测试，以及完整 v17 手动回归清单。
+- 新增领域、迁移与数据安全自动测试，以及完整 v17 手动回归清单。
 - 保持 v17 的 UI、重复日程特征、导入确认、BYOK、本地数据和 Edge 扩展消息兼容。
 
 ### v17 · Resource Workspace

@@ -23,6 +23,7 @@ import {
   requestAIText,
   resolveProviderConfig,
   validateCategorySuggestion,
+  validateCalendarPlanningSuggestion,
   validateResourceSuggestion,
 } from "../src/modules/ai-planner/index.ts";
 import {
@@ -198,6 +199,27 @@ test("AI validators reject invented Categories and Resource IDs", () => {
     validateResourceSuggestion({ resourceIds: [web.id, "invented", web.id], reason: "Useful" }, [web]),
     { resourceIds: [web.id], reason: "Useful" },
   );
+});
+
+test("AI calendar adjustments only accept existing Event IDs and valid time ranges", () => {
+  const fallback = {
+    title: "New urgent event", category: "Work", date: "2026-07-15",
+    startTime: "15:00", endTime: "16:00", priority: "High", type: "schedule", resources: [],
+  };
+  const value = {
+    event: { ...fallback, repeatUnit: "none", repeatInterval: 1, repeatCount: 1 },
+    adjustments: [
+      { eventId: "event-1", date: "2026-07-15", startTime: "16:00", endTime: "17:00", reason: "Make room" },
+      { eventId: "invented", date: "2026-07-15", startTime: "17:00", endTime: "18:00" },
+      { eventId: "event-1", date: "2026-07-15", startTime: "18:00", endTime: "19:00" },
+      { eventId: "event-1", date: "2026-07-15", startTime: "19:00", endTime: "18:00" },
+    ],
+  };
+
+  const result = validateCalendarPlanningSuggestion(value, [eventWithResources([])], [], fallback, false);
+  assert.deepEqual(result.adjustments, [{
+    eventId: "event-1", date: "2026-07-15", startTime: "16:00", endTime: "17:00", reason: "Make room",
+  }]);
 });
 
 test("Confirmed Resource suggestion changes only the editable draft", () => {

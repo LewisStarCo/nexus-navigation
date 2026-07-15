@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   generateRecurringEvents,
+  findEventConflicts,
   markPastPendingEventsUnfinished,
   moveEvent,
   toggleEventCompletion,
@@ -174,6 +175,29 @@ test("legacy unfinished and completion rules remain stable", () => {
 test("event validation preserves the v17 title requirement", () => {
   assert.equal(validateEventDraft(draft()).valid, true);
   assert.equal(validateEventDraft(draft({ title: "   " })).valid, false);
+});
+
+test("conflict detection warns on overlap but allows touching boundaries", () => {
+  const existing = event({ id: "existing", startTime: "15:00", endTime: "16:00" });
+  const overlapping = event({ id: "new", startTime: "15:30", endTime: "16:30" });
+  const adjacent = event({ id: "next", startTime: "16:00", endTime: "17:00" });
+
+  assert.deepEqual(findEventConflicts([overlapping], [existing]), [{
+    proposedId: "new",
+    existingId: "existing",
+    date: "2026-07-13",
+    overlapStart: "15:30",
+    overlapEnd: "16:00",
+  }]);
+  assert.deepEqual(findEventConflicts([adjacent], [existing]), []);
+});
+
+test("conflict detection ignores the edited occurrence but still finds other events", () => {
+  const edited = event({ id: "edited", startTime: "15:00", endTime: "16:00" });
+  const another = event({ id: "another", startTime: "15:45", endTime: "17:00" });
+
+  assert.equal(findEventConflicts([edited], [edited, another], { ignoreEventIds: ["edited"] }).length, 1);
+  assert.equal(findEventConflicts([edited], [edited], { ignoreEventIds: ["edited"] }).length, 0);
 });
 
 test("Today's Focus selectors and progress use local date and Monday week", () => {

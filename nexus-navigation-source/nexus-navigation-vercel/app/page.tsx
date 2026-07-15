@@ -48,8 +48,10 @@ import {
 import {
   generateRecurringEvents,
   dateKey as localDate,
+  findEventConflicts,
   markPastPendingEventsUnfinished,
   updateCurrentEvent,
+  type EventConflict,
 } from "@/src/modules/calendar/domain/eventDomain";
 import {
   calculateProgress,
@@ -152,6 +154,7 @@ export default function Home() {
   const setAiPlanner = useCallback<Dispatch<SetStateAction<AIPlannerSettings>>>((action) => setData((current) => ({ ...current, aiPlanner: resolveState(action, current.aiPlanner) })), [setData]);
   const [focusComposerOpen, setFocusComposerOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [focusConflict, setFocusConflict] = useState<{ additions: NexusEvent[]; replacements: NexusEvent[]; ignoreIds: string[]; proposed: NexusEvent[]; conflicts: EventConflict[] } | null>(null);
   const [focusForm, setFocusForm] = useState({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium" as NexusEvent["priority"], type: "task" as NexusEvent["type"], resources: [] as string[], repeatUnit: "none" as "none" | "week" | "month", repeatInterval: 1, repeatCount: 8 });
   const [customEngine, setCustomEngine] = useState<SearchEngine>({ label: "", url: "" });
   const [zoneToAdd, setZoneToAdd] = useState(zoneOptions[0].zone);
@@ -385,13 +388,22 @@ export default function Home() {
     const title = focusForm.title.trim();
     if (!title || !focusForm.startTime || !focusForm.endTime) return;
     const next = { title, category: focusForm.category.trim() || "其他", date: localDate(new Date()), startTime: focusForm.startTime, endTime: focusForm.endTime, priority: focusForm.priority, type: focusForm.type, resources: focusForm.resources.filter((id) => resourcesById.has(id)) };
-    if (editingEventId) setEvents((items) => items.map((item) => item.id === editingEventId
-      ? updateCurrentEvent(item, next, { createId: () => crypto.randomUUID(), resourceIds: links.map((resource) => resource.id) })
-      : item));
-    else {
-      const additions = generateRecurringEvents({ ...next, repeatUnit: focusForm.repeatUnit, repeatInterval: focusForm.repeatInterval, repeatCount: focusForm.repeatCount }, "local", { createId: () => crypto.randomUUID(), resourceIds: links.map((resource) => resource.id) });
-      setEvents((items) => [...items, ...additions]);
-    }
+    let additions: NexusEvent[] = [];
+    let replacements: NexusEvent[] = [];
+    const ignoreIds = editingEventId ? [editingEventId] : [];
+    if (editingEventId) {
+      const current = events.find((item) => item.id === editingEventId); if (!current) return;
+      replacements = [updateCurrentEvent(current, next, { createId: () => crypto.randomUUID(), resourceIds: links.map((resource) => resource.id) })];
+    } else additions = generateRecurringEvents({ ...next, repeatUnit: focusForm.repeatUnit, repeatInterval: focusForm.repeatInterval, repeatCount: focusForm.repeatCount }, "local", { createId: () => crypto.randomUUID(), resourceIds: links.map((resource) => resource.id) });
+    const proposed = [...replacements, ...additions];
+    const conflicts = findEventConflicts(proposed, events, { ignoreEventIds: ignoreIds });
+    if (conflicts.length) { setFocusConflict({ additions, replacements, ignoreIds, proposed, conflicts }); return; }
+    applyFocusChange(additions, replacements);
+  }
+  function applyFocusChange(additions: NexusEvent[], replacements: NexusEvent[]) {
+    const replacementMap = new Map(replacements.map((item) => [item.id, item]));
+    setEvents((items) => [...items.map((item) => replacementMap.get(item.id) ?? item), ...additions]);
+    setFocusConflict(null);
     setEditingEventId(null);
     setFocusForm({ title: "", category: "", startTime: "19:00", endTime: "20:30", priority: "Medium", type: "task", resources: [], repeatUnit: "none", repeatInterval: 1, repeatCount: 8 });
     setFocusComposerOpen(false);
@@ -454,6 +466,8 @@ export default function Home() {
       <footer><span><b>N</b> Nexus</span><p>所有个性化内容仅保存在你的浏览器中 · {homepageLinks.length} 个主页 Resource · {unclassifiedLinks.length} 个未归类 · {temporaryLinks.length} 个临时资源</p></footer>
 
       {applicationInfo?.type === "application" && <div className="calendar-modal" role="dialog" aria-modal="true" aria-label={`${applicationInfo.name} 应用信息`}><button className="modal-backdrop" onClick={() => setApplicationInfo(null)} aria-label="关闭" /><section className="ai-planner"><header><div><small>APPLICATION RESOURCE</small><h2>💻 {applicationInfo.name}</h2></div><button onClick={() => setApplicationInfo(null)}>×</button></header><p>{applicationInfo.description}</p>{applicationInfo.appIdentifier && <label>App Identifier<input value={applicationInfo.appIdentifier} readOnly /></label>}<p className="api-key-note">出于浏览器安全限制，Nexus 网页不会尝试启动本地应用。未来的 Nexus macOS App 才能在获得你的明确授权后打开 Application Resource。</p><div className="ai-save-row"><span /><button className="save-ai-settings" onClick={() => setApplicationInfo(null)}>知道了</button></div></section></div>}
+
+      {focusConflict && <div className="calendar-modal" role="alertdialog" aria-modal="true" aria-labelledby="focus-conflict-title"><button className="modal-backdrop" onClick={() => setFocusConflict(null)} aria-label="返回调整" /><section className="conflict-dialog"><header><div><small>SCHEDULE CONFLICT</small><h2 id="focus-conflict-title">这个时间已有安排</h2></div><button onClick={() => setFocusConflict(null)}>×</button></header><p>发现 {focusConflict.conflicts.length} 处时间重叠。这只是提醒，不会禁止你同时安排两件事。</p><div className="conflict-list">{focusConflict.conflicts.slice(0, 5).map((conflict, index) => { const proposed = focusConflict.proposed.find((item) => item.id === conflict.proposedId); const existing = events.find((item) => item.id === conflict.existingId) ?? focusConflict.proposed.find((item) => item.id === conflict.existingId); return <article key={`${conflict.proposedId}-${conflict.existingId}-${index}`}><time>{conflict.date}<br />{conflict.overlapStart}–{conflict.overlapEnd}</time><p><strong>{proposed?.title || "新日程"}</strong><span>与 {existing?.title || "已有日程"} 重叠</span></p></article>; })}</div><footer><button onClick={() => setFocusConflict(null)}>返回调整</button><button className="continue-conflict" onClick={() => applyFocusChange(focusConflict.additions, focusConflict.replacements)}>仍然保存</button></footer></section></div>}
 
       {unclassifiedOpen && <div className="saved-links-layer" role="dialog" aria-modal="true" aria-label="未归类资源"><button className="modal-backdrop" onClick={() => setUnclassifiedOpen(false)} aria-label="关闭" /><section className="saved-links-panel"><header><div><small>INBOX</small><h2>未归类</h2><p>还没想好放在哪里的资源。整理后才会进入正式导航分类。</p></div><button onClick={() => setUnclassifiedOpen(false)}>×</button></header><div className="saved-links-toolbar"><span>{unclassifiedLinks.length} 个资源</span><button disabled={!unclassifiedLinks.length} onClick={() => clearCategoryLinks(UNCLASSIFIED_CATEGORY)}>删除全部</button></div><div className="saved-links-list">{unclassifiedLinks.map((link) => <article key={link.id}><SiteIcon link={link} small /><p>{link.type === "website" ? <button type="button" onClick={() => void platformAdapter.openExternalUrl(link.url)}>🌐 {link.name}</button> : <button onClick={() => setApplicationInfo(link)}>💻 {link.name}</button>}<small>{link.type === "website" ? domainOf(link.url) : link.appIdentifier || "Application"}</small></p><button onClick={() => organizeSavedLink(link)}>整理到主页</button><button className="danger" onClick={() => removeResourceIds([link.id])}>删除</button></article>)}{!unclassifiedLinks.length && <div className="saved-links-empty"><span>✓</span><strong>没有待整理资源</strong><p>Edge 扩展中选择“未归类”的网页会出现在这里。</p></div>}</div></section></div>}
 
