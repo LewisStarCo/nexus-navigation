@@ -63,6 +63,28 @@ export function normalizeWebsiteUrl(value: string): string {
   return url.toString();
 }
 
+const LEGACY_EDGE_DESCRIPTION = "从 Microsoft Edge 收藏";
+const KNOWN_WEBSITE_DESCRIPTIONS: Record<string, string> = {
+  "mail.google.com": "Google 邮件收发与协作服务",
+  "google.com": "搜索信息与探索互联网",
+  "www.google.com": "搜索信息与探索互联网",
+  "github.com": "代码托管与开源协作平台",
+  "www.github.com": "代码托管与开源协作平台",
+};
+
+/** Keeps old Edge captures useful without silently rewriting stored user data. */
+export function displayResourceDescription(resource: Resource): string {
+  const description = resource.description?.trim();
+  if (description && description !== LEGACY_EDGE_DESCRIPTION) return description;
+  if (resource.type === "application") return description || "本地应用";
+  try {
+    const host = new URL(resource.url).hostname.toLowerCase();
+    return KNOWN_WEBSITE_DESCRIPTIONS[host] || `快速访问 ${host}`;
+  } catch {
+    return "收藏的网页资源";
+  }
+}
+
 export function validateResourceDraft(draft: ResourceDraft): ResourceValidationResult {
   const errors: string[] = [];
   if (!draft.name.trim()) errors.push("Resource name is required.");

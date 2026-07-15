@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createResource,
+  displayResourceDescription,
   removeResourcesAndDetachEvents,
   updateResource,
 } from "../src/modules/resources/index.ts";
@@ -29,6 +30,7 @@ import {
 import {
   categoriesForEdgeExtension,
   categoryIdFromEdgeExtension,
+  descriptionForEdgeExtension,
 } from "../src/platform/browser/edge-extension/index.ts";
 import {
   BrowserPlatformAdapter,
@@ -90,6 +92,20 @@ test("Resource factory creates discriminated Website and Application records", (
   assert.equal(application.type, "application");
   assert.equal(application.appIdentifier, "com.microsoft.VSCode");
   assert.equal("url" in application, false);
+});
+
+test("legacy Edge placeholders display useful site descriptions without rewriting data", () => {
+  const gmail = createResource(
+    { type: "website", name: "Gmail", description: "从 Microsoft Edge 收藏", url: "https://mail.google.com/" },
+    { id: "gmail", now },
+  );
+  const example = createResource(
+    { type: "website", name: "Example", description: "从 Microsoft Edge 收藏", url: "https://example.com/" },
+    { id: "example", now },
+  );
+  assert.equal(displayResourceDescription(gmail), "Google 邮件收发与协作服务");
+  assert.equal(displayResourceDescription(example), "快速访问 example.com");
+  assert.equal(gmail.description, "从 Microsoft Edge 收藏");
 });
 
 test("Resource update keeps identity and removes fields from the previous type", () => {
@@ -179,6 +195,14 @@ test("Edge category mapper keeps the v1.x name protocol and reserved IDs", () =>
   assert.equal(categoryIdFromEdgeExtension("Study", categories), "study");
   assert.equal(categoryIdFromEdgeExtension("Missing", categories), UNCLASSIFIED_CATEGORY_ID);
   assert.equal(categoryIdFromEdgeExtension(TEMPORARY_CATEGORY_ID, categories), TEMPORARY_CATEGORY_ID);
+});
+
+test("Edge capture descriptions preserve page metadata and remain compatible with old queues", () => {
+  assert.equal(
+    descriptionForEdgeExtension({ description: "  Search   information and explore the web  " }),
+    "Search information and explore the web",
+  );
+  assert.equal(descriptionForEdgeExtension({}), "收藏的网页资源");
 });
 
 test("AI permissions are explicit and can be disabled as one user action", () => {

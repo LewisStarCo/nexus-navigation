@@ -14,6 +14,8 @@ export const NEXUS_EDGE_MESSAGE_SOURCE = "nexus-edge-extension" as const;
 export interface EdgeExtensionCapture {
   id?: string;
   title?: string;
+  /** Optional in v1.2+; older queued captures remain valid without it. */
+  description?: string;
   url?: string;
   /** v1.x transports a category display name or a reserved collection ID. */
   category?: string;
@@ -21,8 +23,17 @@ export interface EdgeExtensionCapture {
   requestAi?: boolean;
 }
 
+export function descriptionForEdgeExtension(
+  capture: Pick<EdgeExtensionCapture, "description">,
+): string {
+  return capture.description?.replace(/\s+/g, " ").trim().slice(0, 240)
+    || "收藏的网页资源";
+}
+
 export interface EdgeExtensionStatePayload {
   categories: string[];
+  /** Website URLs from the latest Nexus state, added in the cross-browser bridge. */
+  savedUrls?: string[];
   siteUrl: string;
 }
 
