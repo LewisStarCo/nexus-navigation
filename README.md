@@ -414,6 +414,14 @@ nexus-navigation-vercel-v18/
 
 ## 开发者日志
 
+### v18.5 · Web ↔ Desktop JSON handoff
+
+- 在“管理资源”中增加 Web ↔ Desktop 数据迁移入口。
+- Web 可以一键导出完整 NexusData JSON，供 Nexus Desktop 预览并确认导入。
+- Web 也可以选择 Desktop 导出的 JSON，先显示 schema、分类、Resource 和 Event 摘要，再由用户确认恢复。
+- 文件只在本机浏览器处理，不上传服务器；非法 JSON 和 future schema 不会覆盖现有数据。
+- 完整 JSON 可能包含用户主动保存的 BYOK API Key，界面会提醒用户妥善保管备份文件。
+
 ### v18.4 · Extension download entry
 
 - 首页增加可隐藏的“获取扩展”入口，并在本地识别 Edge、Chrome 或 Safari。
