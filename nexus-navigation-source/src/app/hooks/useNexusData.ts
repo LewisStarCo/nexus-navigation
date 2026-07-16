@@ -19,6 +19,8 @@ export interface NexusDataState {
   storageError: Error | null;
   setData: Dispatch<SetStateAction<NexusData>>;
   saveNow: (nextData?: NexusData) => Promise<void>;
+  exportData: () => Promise<string>;
+  importData: (rawData: string) => Promise<NexusData>;
   updateAndSave: (
     updater: (current: NexusData) => NexusData,
   ) => Promise<NexusData>;
@@ -127,12 +129,34 @@ export function useNexusData(): NexusDataState {
     return next;
   }, [repository, storageError]);
 
+  const exportData = useCallback(async () => {
+    if (!writableRef.current) {
+      throw storageError ?? new Error("Nexus storage is not readable.");
+    }
+    await repository.save(dataRef.current);
+    return repository.exportData();
+  }, [repository, storageError]);
+
+  const importData = useCallback(async (rawData: string) => {
+    if (!writableRef.current) {
+      throw storageError ?? new Error("Nexus storage is not writable.");
+    }
+    const imported = await repository.importData(rawData);
+    dataRef.current = imported;
+    skipNextAutomaticSave.current = true;
+    setReactData(imported);
+    setStorageError(null);
+    return imported;
+  }, [repository, storageError]);
+
   return {
     data,
     ready,
     storageError,
     setData,
     saveNow,
+    exportData,
+    importData,
     updateAndSave,
   };
 }

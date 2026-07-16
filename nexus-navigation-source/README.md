@@ -443,6 +443,14 @@ next.config.ts         # Next.js 配置
 
 ## 开发者日志
 
+### v18.5 · Web ↔ Desktop JSON handoff
+
+- 在“管理资源”中增加 Web ↔ Desktop 数据迁移入口。
+- Web 可以一键导出完整 NexusData JSON，供 Nexus Desktop 预览并确认导入。
+- Web 也可以选择 Desktop 导出的 JSON，先显示 schema、分类、Resource 和 Event 摘要，再由用户确认恢复。
+- 文件只在本机浏览器处理，不上传服务器；非法 JSON 和 future schema 不会覆盖现有数据。
+- 完整 JSON 可能包含用户主动保存的 BYOK API Key，界面会提醒用户妥善保管备份文件。
+
 ### v18.4 · Extension download entry
 
 - 首页增加可隐藏的“获取扩展”入口，并在本地识别 Edge、Chrome 或 Safari。
@@ -450,6 +458,7 @@ next.config.ts         # Next.js 配置
 - 增加独立 Markdown 安装说明，并在下载弹窗与管理面板中提供入口。
 - “隐藏首页入口”保存在统一 `NexusSettings` 中，旧数据迁移时自动补充默认值；可随时恢复。
 - 从全新安装与“恢复默认内容”中移除 XMRth，已有用户数据不会被迁移静默删除。
+- 修复代码移动到新的 Vercel Root Directory 后，缺少本地 `.openai/hosting.json` 会导致 TypeScript 构建失败的问题；该隐藏文件现在是可选配置。
 
 ### v18.3 · Chrome and Safari Web Extensions
 
